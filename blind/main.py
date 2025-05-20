@@ -4,14 +4,13 @@ import json
 import yaml
 import argparse
 import logging
-import h5py # Though direct use is now in export_utils
-import torch
-import numpy as np # Though direct use might be minimal here now
-import time
-from typing import Dict, List, Optional # Keep for type hints from config
+import torch # For torch.device and potentially other utilities if added later
+import time # For timing the script
+from typing import Dict, List, Optional # For type hints from config
 
 # PyG imports
-from torch_geometric.loader import DataLoader as PyGDataLoader # Explicitly PyG DataLoader
+from torch_geometric.loader import DataLoader as PyGDataLoader
+from torch_geometric.data import Data
 from sklearn.model_selection import train_test_split
 
 # Custom module imports
@@ -19,14 +18,8 @@ from data_utils import (parse_pdb, renumber_atoms_and_residues, get_global_indic
                         load_heavy_atom_coords_from_json, align_frames_to_first, build_graph_dataset)
 from models import HNO, ProteinStateReconstructor2D
 from trainers import train_hno_model, train_decoder2_model
-from checkpoint_utils import load_checkpoint # Though specific use is within trainers
+# checkpoint_utils is used within trainers, not directly in main
 from export_utils import export_final_outputs
-
-from torch_geometric.data import Data
-from torch_geometric.loader import DataLoader
-from torch_geometric.nn import ChebConv
-from torch_cluster import knn_graph
-from sklearn.model_selection import train_test_split
 
 # --- Argument Parsing ---
 parser = argparse.ArgumentParser(
