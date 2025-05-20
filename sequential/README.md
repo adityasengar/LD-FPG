@@ -161,6 +161,7 @@ Log files (e.g., `my_logfile.log` from `param.yaml`, `diffusion_debug.log` from 
     # Or for a specific experiment from grid:
     # python new_diff.py --config diffusion_backbone.yaml --exp_idx 1
     ```
+    Use --instance_id for parallel grid search execution. Add --debug for verbose logs.
 
 * **Key Outputs (in `latent_reps/diff_backbone/`):**
     * `checkpoints/diffusion_exp_bb.pth` (or similar, name includes experiment index)
