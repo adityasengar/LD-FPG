@@ -1,0 +1,42 @@
+run_mode: grid_search
+
+parameters:
+  batch_size: 64
+  num_epochs: 50
+  learning_rate: 1e-5
+  num_gen: 5000
+  save_interval: 50
+  pooling: blind
+
+  # Legacy arrays (not used in curated grid)
+  hidden_dim_options: [128, 256, 512, 1024]
+  model_type_options: ["mlp", "mlp_v2", "mlp_v3"]
+  beta_start_options: [5e-6, 0.005]
+  beta_end_options: [0.03, 0.1]
+  diffusion_steps_options: [1400, 500]
+  scheduler_options: ["linear"]
+
+  # Fallback user-defined parameters (if run_mode = user_defined)
+  hidden_dim: 1024
+  model_type: "mlp_v2"
+  beta_start: 5e-6
+  beta_end: 0.03
+  diffusion_steps: 1400
+
+  # Number of parallel instances to partition the curated experiments among.
+  num_instances: 3
+
+  # Data paths:
+  h5_file_path: "latent_reps/pooled_embedding.h5"
+  dataset_key: "pooled_embedding"
+  output_dir: "latent_reps"
+
+  # Decoder2 settings (for shaping conv2d inputs if 'blind' pooling)
+  decoder2_settings:
+    output_height: 50
+    output_width: 2
+
+# Optional: Specify which residues to extract (default is [1, 2, 3, 4, 5] if not provided)
+#selected_residues: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49]
+#selected_residues: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129]
+selected_residues: [0, 1, 2, 3, 4, 5]
