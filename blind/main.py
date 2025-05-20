@@ -22,6 +22,12 @@ from trainers import train_hno_model, train_decoder2_model
 from checkpoint_utils import load_checkpoint # Though specific use is within trainers
 from export_utils import export_final_outputs
 
+from torch_geometric.data import Data
+from torch_geometric.loader import DataLoader
+from torch_geometric.nn import ChebConv
+from torch_cluster import knn_graph
+from sklearn.model_selection import train_test_split
+
 # --- Argument Parsing ---
 parser = argparse.ArgumentParser(
     description="Protein Autoencoder Training (HNO Encoder + Decoder2) for LD-FPG Step 1"
