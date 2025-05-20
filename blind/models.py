@@ -3,12 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import logging
 import sys # For initial HNO debug flush
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any # Added Any for ProteinStateReconstructor2D logger
 
 from torch_geometric.nn import ChebConv
 from math_utils import build_decoder_mlp # Assuming math_utils.py contains build_decoder_mlp
 
-logger = logging.getLogger(__name__) # Use module-specific logger
+logger = logging.getLogger(__name__)
+
 
 class HNO(nn.Module):
     """
