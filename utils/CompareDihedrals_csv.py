@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-mega_compare_3h5_with_kl_csv.py
 ================================
 Merged global‑distribution and per‑residue KL comparison of three Molecular
 Dynamics trajectories **with automatic CSV exports for every figure**.
