@@ -1,0 +1,63 @@
+# General Settings
+log_file: "logfile_script2_mod.log" # Log file name
+num_workers: 0                     # Number of workers for DataLoader
+force_cpu: false                   # Set to true to force CPU usage
+cuda_device: 0                     # GPU index if CUDA is available and force_cpu is false
+
+# Data Input Configuration
+data:
+  json_path: "../../../my_protein.json" # Path to multi-frame coordinate data
+  pdb_path: "heavy_chain.pdb"           # Path to reference PDB for atom indexing
+
+# Graph Construction Settings
+graph:
+  knn_value: 4                         # K for k-NN graph construction
+
+# HNO Encoder Configuration
+hno_encoder:
+  hidden_dim: 8                        # Hidden dimension for HNO GNN layers
+  cheb_order: 4                        # Chebyshev polynomial order for ChebConv
+  num_epochs: 4000                     # Number of training epochs for HNO
+  learning_rate: 0.0001                # Learning rate for HNO training
+  batch_size: 16                       # Batch size for HNO training
+  save_interval: 500                   # Save checkpoint every N epochs (e.g., 500)
+
+# Decoder2 Training Configuration
+decoder2:
+  num_epochs: 10                     # Number of training epochs for Decoder2
+  learning_rate: 0.0003                # Learning rate for Decoder2 training
+  batch_size: 16                       # Batch size for Decoder2 training
+  base_loss_weight: 1.0                # Multiplier for the base coordinate MSE loss
+  save_interval: 500                   # Save checkpoint every N epochs (e.g., 500)
+
+# Decoder2 Architecture Settings
+decoder2_settings:
+  conditioner_mode: "z_ref"            # Conditioner type: 'X_ref' (coords) or 'z_ref' (embedding)
+  pooling_type: "blind"                # Pooling strategy: 'blind' or 'residue'
+  output_height: 50                    # Target height for AdaptiveAvgPool2d in primary pooling
+  output_width: 2                      # Target width for AdaptiveAvgPool2d in primary pooling
+  mlp_hidden_dim: 128                  # <<< NEW: Hidden dimension for the Decoder2 MLP layers (Example value)
+  num_hidden_layers: 12                # Number of layers in the final Decoder2 MLP
+
+  # Optional advanced features (from original script 2) - Configure as needed
+  use_second_level_pooling: false      # Enable pooling across segment embeddings
+  output_height2: 100                  # Target height for secondary pooling (if enabled)
+  output_width2: 20                    # Target width for secondary pooling (if enabled)
+  use_cross_attention: false           # Enable cross-attention mechanism (if implemented)
+  cross_attention_type: "residue"      # Type of cross-attention ('global', 'residue', if enabled)
+
+# Dihedral Loss Configuration (NEW SECTION)
+dihedral_loss:
+  use_dihedral_loss: true              # <<< NEW: Set true to enable dihedral loss, false to disable
+  torsion_info_path: condensed_residues.json   # <<< NEW: Path to JSON defining dihedral atoms/indices
+  lambda_divergence: 0.1               # <<< NEW: Weight for the divergence term (KL/JS/Wass)
+  lambda_torsion_mse: 1.0              # <<< NEW: Weight for the torsion angle MSE term
+  divergence_type: "JS"                # <<< NEW: Type of divergence ("KL", "JS", "WASSERSTEIN")
+
+# Output Directories Configuration
+output_directories:
+  checkpoint_dir: "checkpoints"        # Directory for saving model checkpoints
+  structure_dir: "structures"         # Directory for coordinate outputs (.h5, .pt)
+  latent_dir: "latent_reps"           # Directory for embedding/latent outputs (.h5, .pt)
+
+# Note: 'recon_output' parameter from the old file was removed as it wasn't used in the scripts provided.
