@@ -1,0 +1,25 @@
+cheb_order: 4
+decoder1:
+  batch_size: 16
+  learning_rate: 0.0001
+  num_epochs: 4000
+decoder2:
+  batch_size: 16
+  learning_rate: 0.0003
+  num_epochs: 60000
+decoder2_settings:
+  conditioner_mode: z_ref
+  cross_attention_type: residue
+  num_hidden_layers: 12
+  output_height: 1
+  output_height2: 100
+  output_width: 3
+  output_width2: 20
+  pooling_type: residue
+  use_cross_attention: false
+  use_second_level_pooling: false
+  weight_value: 1.0
+hidden_dim: 4
+json_path: ../../../my_protein.json
+knn_value: 4
+recon_output: 1
