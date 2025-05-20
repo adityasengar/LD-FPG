@@ -315,3 +315,21 @@ Conference: Advances in Neural Information Processing Systems (NeurIPS) 2025.
 * **File Not Found**: Verify all paths in YAML configurations and command-line arguments.
 * **Checkpoint Loading**: Ensure that paths to pre-trained model components (`hno_model.pth`, `decoder_backbone.pth`, `decoder_sidechain.pth`) in `param.yaml` are correct when running Stage 3.
 * **Log Files**: Check `my_logfile.log` (from `chebnet_seq.py`) and `diffusion_debug.log` (from `new_diff.py`, if `--debug` is used) for detailed error messages.
+
+---
+
+## 📜 License
+
+This project is licensed under the [Creative Commons Attribution 4.0 International License (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
+
+[![CC BY 4.0](https://licensebuttons.net/l/by/4.0/88x31.png)](https://creativecommons.org/licenses/by/4.0/)
+
+This means you are free to:
+* **Share** — copy and redistribute the material in any medium or format
+* **Adapt** — remix, transform, and build upon the material
+for any purpose, even commercially.
+
+Under the following terms:
+* **Attribution** — You must give appropriate credit, provide a link to the license, and indicate if changes were made. You may do so in any reasonable manner, but not in any way that suggests the licensor endorses you or your use.
+
+No additional restrictions — You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.
