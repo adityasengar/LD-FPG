@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-"""
+'''
 calc_lddt_sample.py
 ====================
 
@@ -32,7 +31,7 @@ Usage Examples:
     python calc_lddt.py --h5file full_coords_diff.h5 --xref X_ref.npy \
       --backbone_only --pdb heavy_chain.pdb --max_samples 1000 --seed 42
 
-"""
+'''
 
 import argparse
 import h5py
@@ -40,6 +39,7 @@ import torch
 import numpy as np
 import random
 
+'''
 def load_h5_structure(h5file, key):
     with h5py.File(h5file, "r") as f:
         if key not in f:
@@ -48,12 +48,87 @@ def load_h5_structure(h5file, key):
             raise KeyError(f"Key '{key}' not found in '{h5file}'. Available keys: {avail_keys}")
         data = f[key][:]
     return torch.from_numpy(data).float()
+'''
+
+
+def load_h5_structure(h5file, key):
+    with h5py.File(h5file, "r") as f:
+        if key not in f:
+            avail_keys = list(f.keys())
+            raise KeyError(f"Key '{key}' not found in '{h5file}'. Available keys: {avail_keys}")
+        # Load data into a NumPy array
+        data = f[key][:]
+
+    # Store original shape for logging/debugging if needed
+    original_shape = data.shape
+
+    if data.ndim == 2:
+        # User clarification: If data is 2D, its shape is (N_samples * 2191, 3).
+        # The target shape is (N_samples, 2191, 3).
+
+        # Define the expected structure components for the 2D array
+        expected_middle_dim_size = 2191  # This is the '2191' part in the target (N_samples, 2191, 3)
+        expected_last_dim_size = 3	 # This is the '3' part, which is data.shape[1] for the 2D input
+
+        if data.shape[1] == expected_last_dim_size:
+            # The last dimension of the 2D array matches (it's 3).
+            # The first dimension (data.shape[0]) should be N_samples * expected_middle_dim_size.
+            
+            if data.shape[0] % expected_middle_dim_size == 0:
+                # The first dimension is divisible by expected_middle_dim_size (2191).
+                # This allows us to calculate N_samples.
+                N_samples_calculated = data.shape[0] // expected_middle_dim_size
+                
+                # Reshape the data
+                try:
+                    data = data.reshape((N_samples_calculated, expected_middle_dim_size, expected_last_dim_size))
+                except ValueError as e:
+                    # This safeguard should ideally not be reached if previous checks are correct.
+                    raise ValueError(
+                        f"Error reshaping 2D data. Original shape: {original_shape}, "
+                        f"attempted reshape to ({N_samples_calculated}, {expected_middle_dim_size}, {expected_last_dim_size}). "
+                        f"NumPy error: {e}"
+                    )
+            else:
+                # The first dimension is not a multiple of expected_middle_dim_size.
+                raise ValueError(
+                    f"Cannot reshape 2D data. Original shape: {original_shape}. "
+                    f"The first dimension ({data.shape[0]}) is not a multiple of {expected_middle_dim_size}. "
+                    f"Expected 2D input shape like (N_samples * {expected_middle_dim_size}, {expected_last_dim_size}) "
+                    f"to reshape to (N_samples, {expected_middle_dim_size}, {expected_last_dim_size})."
+                )
+        else:
+            # The second dimension of the 2D array is not expected_last_dim_size (3).
+            raise ValueError(
+                f"Cannot reshape 2D data. Original shape: {original_shape}. "
+                f"The second dimension ({data.shape[1]}) is not {expected_last_dim_size}. "
+                f"Expected 2D input shape like (N_samples * {expected_middle_dim_size}, {expected_last_dim_size}) "
+                f"to reshape to (N_samples, {expected_middle_dim_size}, {expected_last_dim_size})."
+            )
+    elif data.ndim == 3:
+        # Data is already 3D. Assume it's in the target format (N_samples, 2191, 3).
+        # Optionally, add checks for the specific dimensions if they are strictly required.
+        # For example, to ensure the inner dimensions are indeed 2191 and 3:
+        if data.shape[1] != 2191 or data.shape[2] != 3:
+            print(f"Warning: Loaded 3D data has shape {original_shape}. "
+                  f"While it's 3D, the inner dimensions are not (..., 2191, 3). Proceeding as is.")
+        # No reshape needed based on the primary request for 2D data.
+        pass
+    else:
+        # Data is not 2D or 3D.
+        raise ValueError(
+            f"Unsupported data dimensionality. Original shape: {original_shape} (ndim={data.ndim}). "
+            f"This function expects 2D or 3D data."
+        )
+
+    return torch.from_numpy(data).float()
+
 
 def load_xref(xref_file):
     if xref_file.endswith('.pt'):
         return torch.load(xref_file)
     else:
-        arr = np.load(xref_file)
+	arr = np.load(xref_file)
         return torch.from_numpy(arr).float()
 
 def parse_backbone_indices_from_pdb(pdb_file):
@@ -81,7 +156,7 @@ def kabsch_alignment_torch(P, Q):
     # Check for reflection
     d = torch.det(torch.mm(Vt.t(), U.t()))
     if d < 0:
-        Vt[-1, :] = -Vt[-1, :] # Adjust the last row of Vt
+	Vt[-1, :] = -Vt[-1, :] # Adjust the last row of Vt
     R = torch.mm(Vt.t(), U.t())
     Q_aligned = torch.mm(Q_centered, R) + centroid_P
     return Q_aligned
@@ -173,7 +248,7 @@ def main():
         ref_coords = ref_all[backbone_indices, :]
         print(f"Backbone-only mode: using {len(backbone_indices)} backbone atoms from PDB={args.pdb}")
     else:
-        backbone_indices = None
+	backbone_indices = None
         ref_coords = ref_all
 
     # Load predicted coords using the determined key
@@ -206,7 +281,7 @@ def main():
         subset_indices = random.sample(range(N_total), args.max_samples)
         print(f"Sampling {args.max_samples} models (seed={args.seed}).")
     else:
-        subset_indices = range(N_total)
+	subset_indices = range(N_total)
         print(f"Processing all {N_total} models.")
 
 
@@ -246,7 +321,7 @@ def main():
              continue # Skip if alignment fails
 
         # lDDT
-        try:
+	try:
             val, _ = calculate_lddt_global_torch(ref_coords, aligned,
                                                  cutoff=args.cutoff,
                                                  seq_sep=args.seq_sep)
@@ -282,3 +357,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
