@@ -73,9 +73,14 @@ def export_final_outputs(
             if (i + 1) % 500 == 0 or (i + 1) == num_frames: logger.info(f"Exported frame {i + 1}/{num_frames}")
     except Exception as e: logger.error(f"HDF5 export failed: {e}", exc_info=True)
     finally:
-        for f_handle in hdf5_files.values():
-            if f_handle: try: f_handle.close()
-            except Exception as ce: logger.error(f"Error closing HDF5: {ce}")
+        for key, f_handle in hdf5_files.items(): # Iterate with key for better error message
+            if f_handle:
+                try:
+                    f_handle.close()
+                except Exception as ce:
+                    # Use the key to identify which file failed to close
+                    file_path_failed = output_paths.get(key, "Unknown file")
+                    logger.error(f"Error closing HDF5 file '{file_path_failed}': {ce}", exc_info=False)
 
     logger.info("Export finished. Verifying files:")
     # (File verification logic from your original script can be adapted here, using dset_flags)
