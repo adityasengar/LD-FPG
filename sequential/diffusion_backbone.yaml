@@ -1,0 +1,16 @@
+run_mode: grid_search
+parameters:
+  batch_size: 64
+  num_epochs: 3000
+  learning_rate: 1e-5
+  num_gen: 5000
+  save_interval: 50
+  model_type: "mlp_v2"
+  beta_start: 5e-6
+  beta_end: 0.03
+  diffusion_steps: 1400
+  num_instances: 6
+  h5_file_path: "latent_reps/backbone_pooled.h5"
+  dataset_key: "backbone_pooled"
+  output_dir: "latent_reps/diff_backbone"
+  pooling_dim: [22, 3]
