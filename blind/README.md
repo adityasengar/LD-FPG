@@ -113,12 +113,19 @@ Follow these steps sequentially to generate new protein conformations.
     ***decoder2**: Training settings for the Decoder2 MLP.
     ***decoder2_settings**:
         * conditioner_mode: "z_ref" (recommended, uses latent embedding of reference) or "X_ref" (uses coordinates of reference).
+  
         * pooling_type: Should be "blind" for this workflow.
+  
         * output_height, output_width: Dimensions for the AdaptiveAvgPool2d in blind pooling. The product (output_height * output_width) defines the dimension of the pooled latent vector $\mathbf{h}_0$.
+  
         * mlp_hidden_dim, num_hidden_layers: Architecture of the Decoder2 MLP.
+  
     ***dihedral_loss (Optional):**
+  
         * use_dihedral_loss: true or false.
+  
         * torsion_info_path: Path to dihedral definition JSON (e.g., helper/condensed_residues.json).
+  
     ***output_directories**: Specify paths for checkpoint_dir, structure_dir, latent_dir.
 * **Execution:**
     
