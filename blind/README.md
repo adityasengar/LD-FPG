@@ -147,7 +147,9 @@ Follow these steps sequentially to generate new protein conformations.
 * **Key Outputs:**
     * checkpoints/hno_checkpoint.pth: Trained HNO encoder weights.
     * checkpoints/decoder2_checkpoint.pth: Trained Decoder2 MLP weights.
-    ***latent_reps/pooled_embedding.h5**: Pooled latent embeddings ($\mathbf{h}_0$) of the input MD data. **This is the primary input for Step 2.** (Dataset key: pooled_embedding).
+    * 
+    **latent_reps/pooled_embedding.h5**: Pooled latent embeddings ($\mathbf{h}_0$) of the input MD data. **This is the primary input for Step 2.** (Dataset key: pooled_embedding).
+      
     * structures/X_ref_coords.pt: Saved reference coordinates.
     * latent_reps/z_ref_embedding.pt: Saved latent embedding of the reference structure (if conditioner_mode: "z_ref").
     * Other analytical files (e.g., ground_truth_aligned.h5, hno_embeddings.h5).
@@ -157,9 +159,13 @@ Follow these steps sequentially to generate new protein conformations.
 * **Purpose:** Train a DDPM on the distribution of pooled latent embeddings ($\mathbf{h}_0$) generated in Step 1. This model will then be able to generate new $\mathbf{h}_0^{\text{gen}}$ samples.
 * **Configuration (param_diff.yaml):**
     * run_mode: "grid_search" or "user_defined". For a single run, "user_defined" can be simpler if parameters are set directly in the parameters block. Curated grid search is also an option.
-    ***parameters.h5_file_path**: Path to pooled_embedding.h5 generated in Step 1 (e.g., latent_reps/pooled_embedding.h5).
-    ***parameters.dataset_key**: Should be pooled_embedding.
-    ***parameters.pooling**: Must be "blind" to match Step 1's output for this workflow.
+    * 
+    **parameters.h5_file_path**: Path to pooled_embedding.h5 generated in Step 1 (e.g., latent_reps/pooled_embedding.h5).
+      
+    **parameters.dataset_key**: Should be pooled_embedding.
+  
+    **parameters.pooling**: Must be "blind" to match Step 1's output for this workflow.
+  
     * parameters.model_type: Diffusion model architecture (e.g., "mlp_v2", "conv2d").
     * parameters.diffusion_steps, parameters.beta_start, parameters.beta_end: Diffusion schedule parameters.
     * parameters.num_epochs, parameters.learning_rate, parameters.batch_size.
