@@ -98,9 +98,12 @@ Log files (e.g., logfile_script2_mod.log, diffusion_runner.log) will also be cre
 
 * **CUDA:** Recommended for GPU acceleration. Ensure your PyTorch and PyG installations are CUDA-compatible.
 * **Input Data Files** (place in helper/ or update paths in YAML configurations):
-    ***Reference PDB file:** A PDB file containing the heavy atom structure of your protein (e.g., helper/heavy_chain.pdb). Used for initial atom indexing and as a reference.
-    ***Molecular Dynamics Trajectory Data:** A JSON file containing per-frame heavy atom coordinates. The format should be compatible with the load_heavy_atom_coords_from_json function in chebnet_blind.py (e.g., helper/my_protein.json). For large datasets, consider hosting on Zenodo and downloading.
-    ***Dihedral Angle Definition File (Optional):** A JSON file defining atoms for dihedral angle calculations (e.g., helper/condensed_residues.json). Required if dihedral_loss.use_dihedral_loss is true in param.yaml. This file should map to the atom indexing derived from your PDB.
+  
+    **Reference PDB file:** A PDB file containing the heavy atom structure of your protein (e.g., helper/heavy_chain.pdb). Used for initial atom indexing and as a reference.
+  
+    **Molecular Dynamics Trajectory Data:** A JSON file containing per-frame heavy atom coordinates. The format should be compatible with the load_heavy_atom_coords_from_json function in chebnet_blind.py (e.g., helper/my_protein.json). For large datasets, consider hosting on Zenodo and downloading.
+  
+    **Dihedral Angle Definition File (Optional):** A JSON file defining atoms for dihedral angle calculations (e.g., helper/condensed_residues.json). Required if dihedral_loss.use_dihedral_loss is true in param.yaml. This file should map to the atom indexing derived from your PDB.
 
 ---
 
