@@ -23,18 +23,7 @@ Only three small helper utilities have been added plus ~20 strategic lines that
 write CSVs after each ``plt.savefig``.  No other logic is touched, so the
 scientific output is bit‑identical to the original PNGs.
 
-Usage example
--------------
-```bash
-python mega_compare_3h5_with_kl_csv.py \
-       --condensed_json condensed_residues.json \
-       --h5_1 traj_a.h5 --h5_2 traj_b.h5 --h5_3 traj_c.h5 \
-       --labels "WT" "MutA" "MutB" \
-       --out_dir mega_output --device cuda
-```
 
-All additional CLI flags are unchanged; see ``-h`` for details.
-"""
 
 ###############################################################################
 # 0) IMPORTS & GLOBALS
