@@ -1,17 +1,19 @@
+import os # For os.path.isfile, os.path.splitext
 import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader as TorchDataLoader # Renamed to avoid conflict if PyG DataLoader is also imported
+import torch.nn as nn # For nn.Module type hints if needed, though F is used for loss
+import torch.nn.functional as F # For F.mse_loss and other functional calls
+from torch.utils.data import DataLoader as TorchDataLoader # For type hinting
 import logging
-import random
+import random # For random.random in stochastic dihedral loss
 from typing import Dict, Optional, List, Tuple, Any
 
-# Assuming these are in their respective new files
-from models import HNO, ProteinStateReconstructor2D
+# Custom module imports
+from models import HNO, ProteinStateReconstructor2D # For type hinting
 from checkpoint_utils import load_checkpoint, save_checkpoint
-from math_utils import compute_bb_sc_mse, compute_all_dihedrals_vectorized, \
-                       compute_angle_kl_div, compute_angle_js_div, compute_angle_wasserstein
+from math_utils import (compute_bb_sc_mse, compute_all_dihedrals_vectorized,
+                        compute_angle_kl_div, compute_angle_js_div, compute_angle_wasserstein)
 
-logger_trainers = logging.getLogger(__name__) # Module-specific logger
+logger_trainers = logging.getLogger(__name__)
 
 # --- Train HNO Encoder ---
 def train_hno_model(
