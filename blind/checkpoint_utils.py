@@ -1,9 +1,11 @@
 import os
-import sys
+import h5py
 import torch
-import torch.nn as nn
 import logging
-from typing import Dict, Optional, Tuple
+from typing import List, Dict, Any # Added Any for h5py.File and dset_refs
+
+from torch_geometric.data import Data
+from models import HNO, ProteinStateReconstructor2D # For type hinting
 
 def save_checkpoint(state: Dict, filename: str, logger: logging.Logger):
     """Saves model and optimizer state to a file."""
