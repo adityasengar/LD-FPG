@@ -1,0 +1,63 @@
+# --- Input Data Paths ---
+json_path: "../../my_protein.json"              # User-defined
+pdb_filename: "../../heavy_chain.pdb"           # User-defined
+torsion_info_path: "condensed_residues.json" # Assumed path - CHANGE IF DIFFERENT
+
+# --- Output Directories ---
+output_directories:
+  checkpoint_dir: "checkpoints"                 # User-defined
+  structure_dir: "structures"                   # User-defined
+  latent_dir: "latent_reps"                     # User-defined
+
+# --- General Settings ---
+log_file: "my_logfile.log"                    # User-defined
+use_debug_logs: true                          # User-defined
+# force_cpu: false                            # Default: false (use GPU if available)
+# cuda_device: 0                              # Default: 0 (first available GPU)
+num_workers: 4                                # Default: 0 (can increase based on CPU cores)
+decoder_batch_size: 16                        # User-defined (applied globally to decoders)
+inference_batch_size: 32                      # Default: 32 (can adjust based on memory)
+
+# --- Model Hyperparameters ---
+knn_value: 4                                  # User-defined
+cheb_order: 4                                 # User-defined
+hidden_dim: 4                                 # User-defined (NOTE: This is very small!)
+pooling_dim_backbone: [22, 3]                 # User-defined
+pooling_dim_sidechain: [24, 3]                # User-defined
+
+# --- HNO Encoder Training ---
+hno_training:
+  hno_ckpt: "hno_model.pth"                   # Default filename
+  batch_size: 16                              # User-defined
+  num_epochs: 400                             # User-defined
+  learning_rate: 0.0001                       # User-defined
+  save_interval: 10                           # Default: 10
+
+# --- Backbone Decoder Training ---
+decoderB_training:
+  bb_decoder_ckpt: "decoder_backbone.pth"     # Default filename
+  num_epochs: 10                               # User-defined (NOTE: This is very high!)
+  learning_rate: 0.0001                       # User-defined
+  save_interval: 10                           # User-defined
+  decoder_depth: 3                            # User-defined
+  mlp_hidden_dim: 128                         # Default: 128 (add if different needed)
+  # Backbone Dihedral Loss Configuration (phi, psi)
+  use_dihedral: true                          # User-defined
+  lambda_1: 2.0                               # User-defined (Weight for Divergence loss)
+  lambda_2: 1.0                               # User-defined (Weight for Torsion MSE loss)
+  divergence_type: "KL"                       # Default: "KL" (Options: "KL", "JS", "Wasserstein")
+
+# --- Sidechain Decoder Training ---
+decoderSC_training:
+  sc_decoder_ckpt: "decoder_sidechain.pth"    # Default filename
+  num_epochs: 10                             # User-defined
+  learning_rate: 1.0e-05                      # User-defined (1e-5)
+  save_interval: 10                           # User-defined
+  arch_type: 1                                # Set to 1 based on user's 'stepB_use_zref: true' intent
+  decoder_depth: 12                           # User-defined
+  mlp_hidden_dim: 128                         # Default: 128 (add if different needed)
+  # Sidechain Dihedral Loss Configuration (chi1-5)
+  use_dihedral_sc: true                      # Default: false (Enable if desired)
+  lambda_1_sc: 0.0                            # Default: 0.0 (Weight for SC Divergence loss)
+  lambda_2_sc: 0.0                            # Default: 0.0 (Weight for SC Torsion MSE loss)
+  divergence_type_sc: "KL"                    # Default: "KL" (Options: "KL", "JS", "Wasserstein")
