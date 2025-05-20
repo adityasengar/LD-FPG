@@ -349,5 +349,20 @@ Conference: Advances in Neural Information Processing Systems (NeurIPS) 2025.
 - **CUDA Errors:** Ensure your PyTorch and PyG versions are compatible with your CUDA toolkit and GPU drivers. If encountering out-of-memory errors, reduce batch sizes.
 - **Log Files:** Consult logfile_script2_mod.log (for chebnet_blind.py) and diffusion_runner.log (for new_diff.py) for detailed error messages and progress updates. chebnet_diff.py logs to standard output.
 
+---
+
 ## 📜 License
 
+This project is licensed under the [Creative Commons Attribution 4.0 International License (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
+
+[![CC BY 4.0](https://licensebuttons.net/l/by/4.0/88x31.png)](https://creativecommons.org/licenses/by/4.0/)
+
+This means you are free to:
+* **Share** — copy and redistribute the material in any medium or format
+* **Adapt** — remix, transform, and build upon the material
+for any purpose, even commercially.
+
+Under the following terms:
+* **Attribution** — You must give appropriate credit, provide a link to the license, and indicate if changes were made. You may do so in any reasonable manner, but not in any way that suggests the licensor endorses you or your use.
+
+No additional restrictions — You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.
