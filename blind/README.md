@@ -108,12 +108,14 @@ Follow these steps sequentially to generate new protein conformations.
 * **Purpose:** Train the HNO encoder and the Decoder2 MLP. This stage learns to compress protein structures into a global pooled latent representation ($\mathbf{h}_0$) and reconstruct them.
 * **Configuration (param.yaml):**
     **data.json_path**: Path to your MD trajectory JSON file (e.g., helper/my_protein.json).
+  
     **data.pdb_path**: Path to your reference PDB file (e.g., helper/heavy_chain.pdb).
+  
     **hno_encoder**: Settings for the ChebNet encoder (e.g., hidden_dim, cheb_order, num_epochs, learning_rate).
   
-    ***decoder2**: Training settings for the Decoder2 MLP.
+    **decoder2**: Training settings for the Decoder2 MLP.
   
-    ***decoder2_settings**:
+    **decoder2_settings**:
   
         * conditioner_mode: "z_ref" (recommended, uses latent embedding of reference) or "X_ref" (uses coordinates of reference).
   
@@ -123,13 +125,14 @@ Follow these steps sequentially to generate new protein conformations.
   
         * mlp_hidden_dim, num_hidden_layers: Architecture of the Decoder2 MLP.
   
-    ***dihedral_loss (Optional):**
+    **dihedral_loss (Optional):**
   
         * use_dihedral_loss: true or false.
   
         * torsion_info_path: Path to dihedral definition JSON (e.g., helper/condensed_residues.json).
   
-    ***output_directories**: Specify paths for checkpoint_dir, structure_dir, latent_dir.
+    **output_directories**: Specify paths for checkpoint_dir, structure_dir, latent_dir.
+  
 * **Execution:**
     
 ```bash
