@@ -32,7 +32,7 @@ These two runs are provided to allow users to explore simulation variability or 
 
 2.  **Processing Provided Trajectories for ML Input:**
     * The provided `production_run/traj_protein_noPBC.xtc` is a processed, protein-only trajectory.
-    * To convert this (or a similar protein-only trajectory) into the JSON format used by our LD-FPG pipeline, one would typically use a processing script (like `process_trajectory_parallel.py`, available from authors) along with a reference PDB of the protein heavy atoms (often named `heavy_chain.pdb` in the project's context, also available from authors).
+    * To convert this (or a similar protein-only trajectory) into the JSON format used by our LD-FPG pipeline, one would use a processing script (like `extract_residues.py`, available on our github) along with a reference PDB of the protein heavy atoms (often named `heavy_chain.pdb` in the project's context, also available on github).
 
 3.  **Main ML Input JSON:**
     * The primary processed JSON file (`my_protein.json` as referred to in the paper, e.g., `final_combined.json`) which was used to train the LD-FPG model **is provided in the `Processed_ML_Input_JSON/` directory** of this archive. (Note to uploader: Please ensure you manually copy the correct JSON file into this folder).
