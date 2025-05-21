@@ -47,4 +47,3 @@ These two runs are provided to allow users to explore simulation variability or 
 
 Please refer to the main paper for full methodological details.
 
-(TODO: Add any other specific notes about these runs or the data if necessary)
