@@ -105,35 +105,6 @@ While each pooling strategy's directory (`blind/`, `residue/`, `sequential/`) ha
 
 Please refer to the `README.md` inside each specific strategy folder for detailed command-line examples and configuration guidance.
 
-## 📊 Repository Structure
-
-```
-LD-FPG/
-├── blind/                  # Blind pooling strategy implementation
-├── residue/               # Residue-based pooling strategy implementation
-├── sequential/            # Sequential pooling strategy implementation
-├── helper/                # Input data files (PDB, trajectories, etc.)
-├── utils/                 # Shared utility functions
-├── configs/               # Configuration files
-├── LICENSE               # License file
-└── README.md            # This file
-```
-
-## 📄 Citing this Work
-
-If you use this code or the LD-FPG methodology in your research, please cite our NeurIPS 2025 paper:
-
-```bibtex
-@inproceedings{ldfpg2025,
-  title={Generative Modeling of Full-Atom Protein Conformations using Latent Diffusion on Graph Embeddings},
-  author={[Author One, Author Two, et al.]},
-  booktitle={Advances in Neural Information Processing Systems (NeurIPS)},
-  year={2025}
-}
-```
-
-*[Citation will be updated upon acceptance/publication]*
-
 ## 🤝 Contributing
 
 We welcome contributions to improve the LD-FPG framework! Please feel free to:
@@ -142,9 +113,6 @@ We welcome contributions to improve the LD-FPG framework! Please feel free to:
 - Suggest new features or improvements
 - Submit pull requests
 
-## 📧 Contact
-
-For questions about the implementation or methodology, please [open an issue](../../issues) or contact the authors.
 
 ## 📜 License
 
