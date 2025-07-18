@@ -220,6 +220,21 @@ Here's a brief summary of each script:
     python npy_to_xtc.py
     ```
 
+### 10. `pdbs_to_xtc.py`
+
+* **Purpose:** Combines a series of individual PDB files (each representing one frame) into a single, continuous XTC trajectory file. It automatically sorts the input files numerically to ensure the correct frame order.
+* **Key Inputs (via command-line arguments):**
+    * `-p, --pattern`: The input PDB file pattern (e.g., `'generated_*.pdb'`). **Use quotes** to ensure the pattern is passed correctly.
+    * `-o, --output`: Path for the output XTC file (e.g., `'full_trajectory.xtc'`).
+* **Key Output:**
+    * An `.xtc` trajectory file.
+* **Usage:** Run from the command line, providing the pattern for the input PDBs and a name for the output trajectory.
+    ```bash
+    python pdbs_to_xtc.py --pattern "path/to/your_pdbs/generated_*.pdb" --output "trajectory.xtc"
+    ```
+* **Note:** The script assumes that all input PDB files contain the exact same atoms in the same order.
+    
+
 ---
 
 ## 💡 Workflow Examples
