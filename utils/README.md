@@ -23,7 +23,7 @@ Here's a brief summary of each script:
 * **`json_to_pdb.py`**: Extracts the first frame of heavy atom data from the JSON output of `extract_residues.py` and writes it as a PDB file and a simple `.dat` file (listing atom information and coordinates).
 * **`npy_to_pdb.py`**: Converts coordinate data stored in a NumPy `.npy` file into multiple PDB files, using a template PDB.
 * **`npy_to_xtc.py`**: Converts coordinate data from a `.npy` file into an XTC trajectory file, using a PDB file for topology information.
-
+* **`pdbs_to_xtc.py`**: Creates a single XTC trajectory file from a numerically sorted series of individual PDB files.
 ---
 
 ## ⚙️ General Prerequisites
