@@ -1,535 +1,363 @@
-#!/usr/bin/env python
+"""extract_residues.py
+======================
 
-import sys
-import os
+End‑to‑end utility for
+1.  extracting heavy‑atom data + dihedral angles from a PDB + trajectory
+2.  optional frame sub‑sampling via uniform stride (``--fraction``)
+3.  writing a heavy‑atom‑only PDB (``--pdb_out``)
+4.  serialising a **detailed JSON** of per‑residue time‑series data
+5.  **optionally** creating a *condensed* JSON with contiguous atom indices
+   (``--condensed_out``) suitable for dihedral‑comparison utilities.
+
+Dependencies
+------------
+* numpy
+* MDAnalysis
+* tqdm
+
+Install with::
+
+    pip install numpy mdanalysis tqdm
+"""
+
+from __future__ import annotations
+
+import argparse
 import json
+import sys
+from pathlib import Path
+from typing import Dict, List, Sequence
+
 import numpy as np
 from tqdm import tqdm
 
 try:
     import MDAnalysis as mda
-except ImportError:
-    print("Please install MDAnalysis (e.g., pip install MDAnalysis)")
-    sys.exit(1)
+except ImportError:  # pragma: no cover – user environment
+    sys.exit("ERROR: MDAnalysis not installed.  pip install mdanalysis")
 
+# -----------------------------------------------------------------------------
+# Basic PDB parsing (minimal, self‑contained – no BioPython dependence)
+# -----------------------------------------------------------------------------
+class PDB:  # noqa: D101
+    def __init__(self, pdb_path: str | Path):
+        serial: List[int] = []
+        name: List[str] = []
+        resname: List[str] = []
+        chain: List[str] = []
+        resseq: List[int] = []
+        coords: List[List[float]] = []
+        element: List[str] = []
 
-class Residue:
-    def __init__(self, res_num, resname, heavy_atoms, torsion_atoms):
-        """
-        Initialize a Residue instance with static information.
-
-        Parameters:
-        - res_num: Residue number.
-        - resname: Residue name.
-        - heavy_atoms: List of heavy atoms with indices, names, backbone flags, and coordinates.
-        - torsion_atoms: Dictionary containing atom indices for each torsion angle.
-        """
-        self.res_num = res_num
-        self.resname = resname
-        self.heavy_atoms = heavy_atoms
-        self.heavy_atom_indices = np.array([atom['index'] for atom in heavy_atoms])
-        self.heavy_atom_coords_per_frame = []  # Will store coordinates per frame
-        self.torsion_atoms = torsion_atoms
-        self.dihedral_angles = {
-            'phi': [],
-            'psi': [],
-            'chi': {}
-        }
-
-    def calculate_dihedrals(self, coords):
-        """
-        Calculate dihedral angles for the residue given atom coordinates.
-
-        Parameters:
-        - coords: Atom coordinates for the entire system at the current time step.
-        """
-        # Backbone dihedrals
-        for angle_name in ['phi', 'psi']:
-            atom_indices = self.torsion_atoms.get(angle_name)
-            if atom_indices and None not in atom_indices:
-                atom_coords = coords[atom_indices].reshape(1, 4, 3)
-                angle = calc_dihedral_angles(atom_coords)
-                self.dihedral_angles[angle_name].append(angle[0])
-            else:
-                self.dihedral_angles[angle_name].append(np.nan)
-
-        # Side-chain dihedrals
-        chi_angles = self.torsion_atoms.get('chi') or {}
-        for chi_name, atom_indices in chi_angles.items():
-            if atom_indices and None not in atom_indices:
-                atom_coords = coords[atom_indices].reshape(1, 4, 3)
-                angle = calc_dihedral_angles(atom_coords)
-                if chi_name not in self.dihedral_angles['chi']:
-                    self.dihedral_angles['chi'][chi_name] = []
-                self.dihedral_angles['chi'][chi_name].append(angle[0])
-            else:
-                if chi_name not in self.dihedral_angles['chi']:
-                    self.dihedral_angles['chi'][chi_name] = []
-                self.dihedral_angles['chi'][chi_name].append(np.nan)
-
-        # Store heavy atom coordinates for the current frame
-        heavy_atom_coords = coords[self.heavy_atom_indices]
-        self.heavy_atom_coords_per_frame.append(heavy_atom_coords.copy())
-
-
-def process_trajectory(pdb_file, traj_file, rotamers, higher_order='Non'):
-    """
-    Process the trajectory file and calculate dihedral angles for specified residues.
-
-    Parameters:
-    - pdb_file: Path to the PDB file.
-    - traj_file: Path to the trajectory file (.dcd, .xtc, etc.).
-    - rotamers: List of residue numbers to process.
-    - higher_order: If 'all', calculates higher-order side-chain dihedrals.
-
-    Returns:
-    - residues: Dictionary of Residue instances with calculated dihedral angles.
-    """
-    # Load PDB data
-    pdb = PDB(pdb_file)
-
-    # Extract static information
-    residues = {}
-    resseq_to_indices = build_resseq_to_indices(pdb)
-
-    for res_num in rotamers:
-        if res_num not in resseq_to_indices:
-            continue
-
-        res_indices = resseq_to_indices[res_num]
-        resname = pdb.resname[res_indices[0]]
-
-        # Extract heavy atoms
-        heavy_atoms = extract_heavy_atoms(pdb, res_indices)
-
-        # Extract torsion atoms
-        torsion_atoms = {}
-        # Backbone torsion atoms
-        phi_atoms = get_phi_atoms(pdb, resseq_to_indices, res_num)
-        psi_atoms = get_psi_atoms(pdb, resseq_to_indices, res_num)
-        torsion_atoms['phi'] = phi_atoms
-        torsion_atoms['psi'] = psi_atoms
-
-        # Side-chain torsion atoms
-        chi_atoms = get_chi_atoms(pdb, resname, res_indices, higher_order)
-        torsion_atoms['chi'] = chi_atoms if chi_atoms is not None else {}
-
-        # Create Residue instance
-        residue = Residue(res_num, resname, heavy_atoms, torsion_atoms)
-        residues[res_num] = residue
-
-    # Process trajectory
-    # Load trajectory data
-    traj_coords = load_trajectory(pdb_file, traj_file)
-
-    # Iterate over frames
-    num_frames = traj_coords.shape[0]
-    for frame_idx in tqdm(range(num_frames), desc="Processing frames"):
-        coords = traj_coords[frame_idx]
-
-        # Calculate dihedrals for each residue
-        for residue in residues.values():
-            residue.calculate_dihedrals(coords)
-
-    return residues
-
-
-# Helper functions
-
-def build_resseq_to_indices(pdb):
-    """
-    Build a mapping from residue sequence numbers to their atom indices in the pdb arrays.
-    """
-    resseq_to_indices = {}
-    unique_resseq = np.unique(pdb.resseq)
-    for resseq in unique_resseq:
-        indices = np.where(pdb.resseq == resseq)[0]
-        resseq_to_indices[resseq] = indices
-    return resseq_to_indices
-
-def extract_heavy_atoms(pdb, res_indices):
-    """
-    Extracts heavy atoms (non-hydrogen atoms) for a given residue.
-    """
-    heavy_atom_mask = ~np.isin(pdb.element[res_indices], ['H'])  # Exclude hydrogen atoms
-    heavy_atom_indices = res_indices[heavy_atom_mask]
-    heavy_atom_names = pdb.name[heavy_atom_indices]
-    heavy_atom_coords = pdb.coords[heavy_atom_indices]
-    backbone_atoms = {'N', 'CA', 'C', 'O', 'OXT'}
-    backbone_flags = np.isin(heavy_atom_names, list(backbone_atoms))
-    heavy_atoms = []
-    for idx, name, is_backbone, coord in zip(heavy_atom_indices, heavy_atom_names, backbone_flags, heavy_atom_coords):
-        heavy_atoms.append({
-            'index': idx,
-            'name': name,
-            'is_backbone': is_backbone,
-            'coords': coord
-        })
-    return heavy_atoms
-
-def get_phi_atoms(pdb, resseq_to_indices, res_num):
-    """
-    Get atom indices for phi angle calculation.
-    """
-    if (res_num - 1) in resseq_to_indices:
-        prev_res_indices = resseq_to_indices[res_num - 1]
-        C_prev = select_atom(pdb, prev_res_indices, 'C')
-        N_i = select_atom(pdb, resseq_to_indices[res_num], 'N')
-        CA_i = select_atom(pdb, resseq_to_indices[res_num], 'CA')
-        C_i = select_atom(pdb, resseq_to_indices[res_num], 'C')
-        if None not in [C_prev, N_i, CA_i, C_i]:
-            return [C_prev, N_i, CA_i, C_i]
-    return None
-
-def get_psi_atoms(pdb, resseq_to_indices, res_num):
-    """
-    Get atom indices for psi angle calculation.
-    """
-    if (res_num + 1) in resseq_to_indices:
-        N_i = select_atom(pdb, resseq_to_indices[res_num], 'N')
-        CA_i = select_atom(pdb, resseq_to_indices[res_num], 'CA')
-        C_i = select_atom(pdb, resseq_to_indices[res_num], 'C')
-        N_next = select_atom(pdb, resseq_to_indices[res_num + 1], 'N')
-        if None not in [N_i, CA_i, C_i, N_next]:
-            return [N_i, CA_i, C_i, N_next]
-    return None
-
-def get_chi_atoms(pdb, resname, res_indices, higher_order):
-    """
-    Get atom indices for chi angle calculations.
-    """
-    chi_atoms = {}
-    side_chain_atoms = get_side_chain_atoms(resname)
-    if side_chain_atoms is None:
-        return {}
-    # Chi1
-    N = select_atom(pdb, res_indices, 'N')
-    CA = select_atom(pdb, res_indices, 'CA')
-    CB = select_atom(pdb, res_indices, 'CB')
-    side_atom = select_atom(pdb, res_indices, side_chain_atoms['chi1'])
-    if None not in [N, CA, CB, side_atom]:
-        chi_atoms['chi1'] = [N, CA, CB, side_atom]
-    else:
-        chi_atoms['chi1'] = None
-
-    # Higher-order chis
-    if higher_order == 'all':
-        for chi_num in range(2, 6):
-            chi_key = f'chi{chi_num}'
-            atom_names = side_chain_atoms.get(chi_key)
-            if atom_names:
-                atom_indices = []
-                for atom_name in atom_names:
-                    atom_idx = select_atom(pdb, res_indices, atom_name)
-                    if atom_idx is None:
-                        break
-                    atom_indices.append(atom_idx)
-                else:
-                    chi_atoms[chi_key] = atom_indices
+        with open(pdb_path, "r") as fh:
+            for line in fh:
+                if not (line.startswith("ATOM") or line.startswith("HETATM")):
                     continue
-            chi_atoms[chi_key] = None
+                serial.append(int(line[6:11]))
+                name.append(line[12:16].strip())
+                resname.append(line[17:20].strip())
+                chain.append(line[21].strip())
+                resseq.append(int(line[22:26]))
+                coords.append(
+                    [float(line[30:38]), float(line[38:46]), float(line[46:54])]
+                )
+                elem = line[76:78].strip()
+                element.append(elem if elem else line[12:14].strip())
 
-    return chi_atoms
+        self.serial = np.asarray(serial, dtype=int)
+        self.name = np.asarray(name)
+        self.resname = np.asarray(resname)
+        self.chain = np.asarray(chain)
+        self.resseq = np.asarray(resseq, dtype=int)
+        self.coords = np.asarray(coords, dtype=float)
+        self.element = np.asarray(element)
 
-def load_trajectory(pdb_file, traj_file):
-    """
-    Load trajectory data from a .dcd or .xtc file.
+    # -------- helper ---------------------------------------------------------
+    def residues(self) -> Dict[int, np.ndarray]:
+        """Map residue number → atom indices (numpy array)."""
+        res_map: Dict[int, List[int]] = {}
+        for idx, res_id in enumerate(self.resseq):
+            res_map.setdefault(int(res_id), []).append(idx)
+        return {k: np.asarray(v, dtype=int) for k, v in res_map.items()}
 
-    Parameters:
-    - pdb_file: Path to the PDB file.
-    - traj_file: Path to the trajectory file.
 
-    Returns:
-    - traj_coords: NumPy array of shape (num_frames, num_atoms, 3)
-    """
-    # Create an MDAnalysis Universe
-    u = mda.Universe(pdb_file, traj_file)
-    num_frames = len(u.trajectory)
-    num_atoms = len(u.atoms)
-    traj_coords = np.zeros((num_frames, num_atoms, 3), dtype=np.float32)
+# -----------------------------------------------------------------------------
+# Geometry helpers
+# -----------------------------------------------------------------------------
 
-    for ts in tqdm(u.trajectory, desc="Loading trajectory"):
-        # ts.frame starts at 0 in MDAnalysis, so we use ts.frame directly
-        traj_coords[ts.frame] = ts.positions
-
-    return traj_coords
-
-def select_atom(pdb, indices, atom_name):
-    """
-    Selects the index of an atom by name within given indices.
-    """
-    atom_sel = pdb.name[indices] == atom_name
-    if np.any(atom_sel):
-        return indices[atom_sel][0]
-    else:
-        return None
-
-def calc_dihedral_angles(coords):
-    """
-    Calculates dihedral angles from coordinates.
-
-    Parameters:
-    - coords: Array of shape (1, 4, 3)
-
-    Returns:
-    - angles: Array of dihedral angles in degrees
-    """
-    angles = calc_dihedral(coords) * 180.0 / np.pi
-    return angles
-
-def calc_dihedral(coords):
-    """
-    Calculate dihedral angles for a set of coordinates.
-
-    Parameters:
-    - coords: Array of shape (1, 4, 3)
-
-    Returns:
-    - angles: Array of dihedral angles in radians
-    """
-    b1 = coords[:, 1, :] - coords[:, 0, :]
-    b2 = coords[:, 2, :] - coords[:, 1, :]
-    b3 = coords[:, 3, :] - coords[:, 2, :]
-
+def _dihedral(coords: np.ndarray) -> float:
+    """Return dihedral angle in **radians** for a (4, 3) coordinate array."""
+    b1, b2, b3 = coords[1] - coords[0], coords[2] - coords[1], coords[3] - coords[2]
     n1 = np.cross(b1, b2)
     n2 = np.cross(b2, b3)
-
-    b2_norm = b2 / np.linalg.norm(b2, axis=1)[:, np.newaxis]
-
-    m1 = np.cross(n1, b2_norm)
-
-    x = np.einsum('ij,ij->i', n1, n2)
-    y = np.einsum('ij,ij->i', m1, n2)
-
-    angles = np.arctan2(y, x)
-    return angles
-
-def get_side_chain_atoms(resname):
-    """
-    Returns a dictionary of side-chain atom names for chi angles based on residue name.
-    """
-    chi_atoms = {
-        # Definitions for residues with side-chain chi angles
-        'ARG': {
-            'chi1': 'CG',
-            'chi2': ['CA', 'CB', 'CG', 'CD'],
-            'chi3': ['CB', 'CG', 'CD', 'NE'],
-            'chi4': ['CG', 'CD', 'NE', 'CZ'],
-            'chi5': ['CD', 'NE', 'CZ', 'NH1']
-        },
-        'ASN': {
-            'chi1': 'CG',
-            'chi2': ['CA', 'CB', 'CG', 'OD1']
-        },
-        'ASP': {
-            'chi1': 'CG',
-            'chi2': ['CA', 'CB', 'CG', 'OD1']
-        },
-        'CYS': {
-            'chi1': 'SG'
-        },
-        'GLN': {
-            'chi1': 'CG',
-            'chi2': ['CA', 'CB', 'CG', 'CD'],
-            'chi3': ['CB', 'CG', 'CD', 'OE1']
-        },
-        'GLU': {
-            'chi1': 'CG',
-            'chi2': ['CA', 'CB', 'CG', 'CD'],
-            'chi3': ['CB', 'CG', 'CD', 'OE1']
-        },
-        'HIS': {
-            'chi1': 'CG',
-            'chi2': ['CA', 'CB', 'CG', 'ND1']
-        },
-        'ILE': {
-            'chi1': 'CG1',
-            'chi2': ['CA', 'CB', 'CG1', 'CD1']
-        },
-        'LEU': {
-            'chi1': 'CG',
-            'chi2': ['CA', 'CB', 'CG', 'CD1']
-        },
-        'LYS': {
-            'chi1': 'CG',
-            'chi2': ['CA', 'CB', 'CG', 'CD'],
-            'chi3': ['CB', 'CG', 'CD', 'CE'],
-            'chi4': ['CG', 'CD', 'CE', 'NZ']
-        },
-        'MET': {
-            'chi1': 'CG',
-            'chi2': ['CA', 'CB', 'CG', 'SD'],
-            'chi3': ['CB', 'CG', 'SD', 'CE']
-        },
-        'PHE': {
-            'chi1': 'CG',
-            'chi2': ['CA', 'CB', 'CG', 'CD1']
-        },
-        'PRO': {
-            'chi1': 'CG',
-            'chi2': ['CA', 'CB', 'CG', 'CD']
-        },
-        'SER': {
-            'chi1': 'OG'
-        },
-        'THR': {
-            'chi1': 'OG1'
-        },
-        'TRP': {
-            'chi1': 'CG',
-            'chi2': ['CA', 'CB', 'CG', 'CD1']
-        },
-        'TYR': {
-            'chi1': 'CG',
-            'chi2': ['CA', 'CB', 'CG', 'CD1']
-        },
-        'VAL': {
-            'chi1': 'CG1'
-        }
-    }
-    return chi_atoms.get(resname, None)
+    m1 = np.cross(n1, b2 / np.linalg.norm(b2))
+    x = np.dot(n1, n2)
+    y = np.dot(m1, n2)
+    return float(np.arctan2(y, x))
 
 
-class PDB:
-    def __init__(self, pdb_file):
-        """
-        Initialize PDB object by parsing a PDB file.
-
-        Parameters:
-        - pdb_file: Path to the PDB file.
-        """
-        serial = []
-        name = []
-        resname = []
-        chainID = []
-        resseq = []
-        x = []
-        y = []
-        z = []
-        element = []
-
-        with open(pdb_file, 'r') as f:
-            for line in f:
-                if line.startswith('ATOM') or line.startswith('HETATM'):
-                    serial.append(int(line[6:11]))
-                    name.append(line[12:16].strip())
-                    resname.append(line[17:20].strip())
-                    chainID.append(line[21].strip())
-                    resseq.append(int(line[22:26]))
-                    x.append(float(line[30:38]))
-                    y.append(float(line[38:46]))
-                    z.append(float(line[46:54]))
-                    elem = line[76:78].strip()
-                    if elem:
-                        element.append(elem)
-                    else:
-                        # fallback: use the first characters from line[12:14]
-                        element.append(line[12:14].strip())
-
-        self.serial = np.array(serial)
-        self.name = np.array(name)
-        self.resname = np.array(resname)
-        self.chainID = np.array(chainID)
-        self.resseq = np.array(resseq)
-        self.coords = np.column_stack((x, y, z))
-        self.element = np.array(element)
+def dihedral_deg(coords: np.ndarray) -> float:
+    return np.degrees(_dihedral(coords))
 
 
-def serialize_residues(residues):
-    """
-    Serialize the residues data into a JSON-serializable format.
+# -----------------------------------------------------------------------------
+# χ‑angle templates (truncated; extend as needed)
+# -----------------------------------------------------------------------------
+_CHI_TEMPL = {
+    "ARG": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "CD"]},
+    "ASN": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "OD1"]},
+    "ASP": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "OD1"]},
+    "CYS": {"chi1": "SG"},
+    "GLN": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "CD"]},
+    "GLU": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "CD"]},
+    "HIS": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "ND1"]},
+    "ILE": {"chi1": "CG1", "chi2": ["CA", "CB", "CG1", "CD1"]},
+    "LEU": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "CD1"]},
+    "LYS": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "CD"]},
+    "MET": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "SD"]},
+    "PHE": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "CD1"]},
+    "PRO": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "CD"]},
+    "SER": {"chi1": "OG"},
+    "THR": {"chi1": "OG1"},
+    "TRP": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "CD1"]},
+    "TYR": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "CD1"]},
+    "VAL": {"chi1": "CG1"},
+}
 
-    Parameters:
-    - residues: Dictionary of Residue instances.
 
-    Returns:
-    - serialized_data: Dictionary with serialized data.
-    """
-    def convert_numpy_types(obj):
-        """
-        Recursively convert NumPy types to native Python types.
-        """
-        if isinstance(obj, dict):
-            return {k: convert_numpy_types(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [convert_numpy_types(v) for v in obj]
-        elif isinstance(obj, np.ndarray):
-            return convert_numpy_types(obj.tolist())
-        elif isinstance(obj, np.integer):
-            return int(obj)
-        elif isinstance(obj, np.floating):
-            return float(obj)
-        elif isinstance(obj, np.bool_):
-            return bool(obj)
-        elif obj is np.nan:
-            return None
-        else:
-            return obj
+# -----------------------------------------------------------------------------
+# Residue container
+# -----------------------------------------------------------------------------
+class ResidueData:  # noqa: D101
+    def __init__(self, res_id: int, resname: str, pdb: PDB, atom_indices: np.ndarray):
+        self.res_id = res_id
+        self.resname = resname
+        self.atom_indices = atom_indices  # heavy atoms only
+        # boolean mask determines backbone vs side‑chain
+        bb_mask = np.isin(pdb.name[atom_indices], ["N", "CA", "C", "O", "OXT"])
+        self.backbone_idx = atom_indices[bb_mask]
+        self.sidechain_idx = atom_indices[~bb_mask]
+        # torsion templates (indices in original numbering, may contain None)
+        self.torsion = {"phi": None, "psi": None, "chi": {}}
 
-    serialized_data = {}
-    for res_num, residue in residues.items():
-        serialized_residue = {
-            'res_num': int(residue.res_num),
-            'resname': residue.resname,
-            'heavy_atoms': [],
-            'heavy_atom_indices': residue.heavy_atom_indices.tolist(),
-            'heavy_atom_coords_per_frame': [
-                coords.tolist() for coords in residue.heavy_atom_coords_per_frame
+    # ------- setters ---------------------------------------------------------
+    def set_phi(self, idx: Sequence[int]):
+        self.torsion["phi"] = list(idx)
+
+    def set_psi(self, idx: Sequence[int]):
+        self.torsion["psi"] = list(idx)
+
+    def set_chi(self, name: str, idx: Sequence[int]):
+        self.torsion["chi"][name] = list(idx)
+
+
+# -----------------------------------------------------------------------------
+# Helpers to find named atoms inside a residue
+# -----------------------------------------------------------------------------
+
+def _find_atom(pdb: PDB, res_indices: np.ndarray, target: str | Sequence[str]):
+    """Return **first** atom index matching *target* (name string or list)."""
+    if isinstance(target, str):
+        target = [target]
+    mask = np.isin(pdb.name[res_indices], target)  # type: ignore[arg-type]
+    return int(res_indices[mask][0]) if mask.any() else None
+
+
+# -----------------------------------------------------------------------------
+# Main extraction routine
+# -----------------------------------------------------------------------------
+
+def extract(pdb_path: str | Path, traj_path: str | Path, fraction: float):
+    pdb = PDB(pdb_path)
+    res_map = pdb.residues()
+
+    # ---------- build per‑residue metadata ----------------------------------
+    residues: Dict[int, ResidueData] = {}
+    for res_id, atom_idx in res_map.items():
+        # heavy atoms = non‑hydrogen
+        heavy_idx = atom_idx[pdb.element[atom_idx] != "H"]
+        res = ResidueData(res_id, pdb.resname[atom_idx][0], pdb, heavy_idx)
+        residues[res_id] = res
+
+    # ---------- backbone torsions (φ/ψ) -------------------------------------
+    for res_id, res in residues.items():
+        # φ  = C(i‑1)‑N‑CA‑C
+        if (res_id - 1) in residues:
+            c_prev = _find_atom(pdb, residues[res_id - 1].atom_indices, "C")
+            n_i = _find_atom(pdb, res.atom_indices, "N")
+            ca_i = _find_atom(pdb, res.atom_indices, "CA")
+            c_i = _find_atom(pdb, res.atom_indices, "C")
+            if None not in (c_prev, n_i, ca_i, c_i):
+                res.set_phi([c_prev, n_i, ca_i, c_i])
+        # ψ  = N‑CA‑C‑N(i+1)
+        if (res_id + 1) in residues:
+            n_i = _find_atom(pdb, res.atom_indices, "N")
+            ca_i = _find_atom(pdb, res.atom_indices, "CA")
+            c_i = _find_atom(pdb, res.atom_indices, "C")
+            n_next = _find_atom(pdb, residues[res_id + 1].atom_indices, "N")
+            if None not in (n_i, ca_i, c_i, n_next):
+                res.set_psi([n_i, ca_i, c_i, n_next])
+
+    # ---------- side‑chain χ torsions ---------------------------------------
+    for res in residues.values():
+        templ = _CHI_TEMPL.get(res.resname, {})
+        if not templ:
+            continue
+        n = _find_atom(pdb, res.atom_indices, "N")
+        ca = _find_atom(pdb, res.atom_indices, "CA")
+        cb = _find_atom(pdb, res.atom_indices, "CB")
+        # χ1
+        x1 = _find_atom(pdb, res.atom_indices, templ["chi1"])
+        if None not in (n, ca, cb, x1):
+            res.set_chi("chi1", [n, ca, cb, x1])
+        # higher χn (template gives explicit list of 4 atoms)
+        for key in ("chi2", "chi3", "chi4", "chi5"):
+            if key not in templ:
+                continue
+            idx = [_find_atom(pdb, res.atom_indices, name) for name in templ[key]]
+            if None not in idx:
+                res.set_chi(key, idx)  # type: ignore[arg-type]
+
+    # ---------- trajectory processing ---------------------------------------
+    u = mda.Universe(pdb_path, traj_path)
+    stride = max(int(round(1.0 / fraction)), 1)
+    selected = set(range(0, len(u.trajectory), stride))
+
+    # container: res_id → list[frame][coords]
+    coords_store: Dict[int, List[np.ndarray]] = {rid: [] for rid in residues}
+
+    for ts in tqdm(u.trajectory, desc="Frames", total=len(selected)):
+        if ts.frame not in selected:
+            continue
+        xyz = ts.positions  # (n_atoms, 3)
+        for rid, res in residues.items():
+            coords_store[rid].append(xyz[res.atom_indices])
+
+    # ---------- JSON serialisation -----------------------------------------
+    detailed_json: Dict[str, dict] = {}
+    for rid, res in residues.items():
+        detailed_json[str(rid)] = {
+            "resname": res.resname,
+            "heavy_atom_indices": res.atom_indices.tolist(),
+            "heavy_atom_coords_per_frame": [c.tolist() for c in coords_store[rid]],
+            "heavy_atoms": [  # metadata per atom
+                {
+                    "index": int(idx),
+                    "name": str(pdb.name[idx]),
+                    "is_backbone": bool(idx in res.backbone_idx),
+                }
+                for idx in res.atom_indices
             ],
-            'torsion_atoms': residue.torsion_atoms,  # Atom indices involved in torsion angles
-            'dihedral_angles': residue.dihedral_angles
+            "torsion_atoms": res.torsion,
         }
+    return pdb, detailed_json
 
-        # Serialize heavy_atoms
-        for atom in residue.heavy_atoms:
-            serialized_atom = {
-                'index': int(atom['index']),
-                'name': atom['name'],
-                'is_backbone': bool(atom['is_backbone']),
-                'coords': [float(c) for c in atom['coords']]
-            }
-            serialized_residue['heavy_atoms'].append(serialized_atom)
 
-        # Convert the entire serialized_residue to native Python types
-        serialized_residue = convert_numpy_types(serialized_residue)
-        # Store under string key (JSON keys must be strings)
-        serialized_data[str(res_num)] = serialized_residue
+# -----------------------------------------------------------------------------
+# Heavy‑atom PDB writer (preserve serial numbers)
+# -----------------------------------------------------------------------------
 
-    return serialized_data
+def write_heavy_pdb(pdb: PDB, path: str | Path):
+    with open(path, "w") as fh:
+        fh.write("HEADER    HEAVY ATOMS ONLY\n")
+        for i in range(len(pdb.serial)):
+            if pdb.element[i] == "H":
+                continue
+            fh.write(
+                f"ATOM  {pdb.serial[i]:5d} {pdb.name[i]:>4} {pdb.resname[i]:>3} "
+                f"{pdb.chain[i]:>1}{pdb.resseq[i]:4d}    "
+                f"{pdb.coords[i,0]:8.3f}{pdb.coords[i,1]:8.3f}{pdb.coords[i,2]:8.3f}"
+                f"  1.00  0.00           {pdb.element[i]:>2}\n"
+            )
+    print(f"[✓] Heavy‑atom PDB written → {path}")
+
+
+# -----------------------------------------------------------------------------
+# Condensing functions (old‑>new remap)
+# -----------------------------------------------------------------------------
+
+def _build_old2new(original: dict) -> Dict[int, int]:
+    unique = sorted(
+        {
+            idx for res in original.values() for idx in res["heavy_atom_indices"]
+        }
+    )
+    return {old: new for new, old in enumerate(unique)}
+
+
+def _condense(original: dict) -> dict:
+    old2new = _build_old2new(original)
+    condensed: Dict[str, dict] = {}
+    for new_rid, old_rid_str in enumerate(sorted(original, key=int)):
+        res = original[old_rid_str]
+        bb_old, sc_old = [], []
+        for atom in res["heavy_atoms"]:
+            (bb_old if atom["is_backbone"] else sc_old).append(atom["index"])
+        bb_new = [old2new[i] for i in bb_old]
+        sc_new = [old2new[i] for i in sc_old]
+
+        tors_new = {"phi": None, "psi": None, "chi": {}}
+        t_old = res.get("torsion_atoms", {})
+        for key in ("phi", "psi"):
+            old_q = t_old.get(key)
+            tors_new[key] = [old2new[i] for i in old_q] if old_q and None not in old_q else None
+        for chi_name, chi_atoms in (t_old.get("chi", {}) or {}).items():
+            tors_new["chi"][chi_name] = (
+                [old2new[i] for i in chi_atoms] if chi_atoms and None not in chi_atoms else None
+            )
+
+        condensed[str(new_rid)] = {
+            "new_res_id": new_rid,
+            "old_res_id": int(old_rid_str),
+            "resname": res["resname"],
+            "backbone": bb_new,
+            "sidechain": sc_new,
+            "torsion_atoms": tors_new,
+        }
+    return condensed
+
+
+# -----------------------------------------------------------------------------
+# CLI entry point
+# -----------------------------------------------------------------------------
+
+def cli():  # noqa: D401
+    """Parse args & run extraction."""
+    p = argparse.ArgumentParser(description="Extract heavy atoms + dihedrals")
+    p.add_argument("--pdb", required=True, help="Topology PDB file")
+    p.add_argument("--traj", required=True, help="Trajectory (XTC/DCD)")
+    p.add_argument(
+        "--fraction",
+        type=float,
+        default=1.0,
+        help="Fraction of frames to keep (uniform stride)",
+    )
+    p.add_argument("--json_out", default="residues_data.json", help="Detailed JSON")
+    p.add_argument(
+        "--pdb_out", default="heavy_chain.pdb", help="Heavy‑atom PDB filename"
+    )
+    p.add_argument(
+        "--condensed_out",
+        default=None,
+        help="Write condensed JSON with contiguous atom indices",
+    )
+    args = p.parse_args()
+
+    if not (0 < args.fraction <= 1):
+        p.error("--fraction must be > 0 and ≤ 1")
+
+    pdb, detailed = extract(args.pdb, args.traj, args.fraction)
+
+    # write files
+    write_heavy_pdb(pdb, args.pdb_out)
+    Path(args.json_out).write_text(json.dumps(detailed, indent=2))
+    print(f"[✓] Detailed JSON written → {args.json_out}")
+
+    if args.condensed_out:
+        condensed = _condense(detailed)
+        Path(args.condensed_out).write_text(json.dumps(condensed, indent=2))
+        print(f"[✓] Condensed JSON written → {args.condensed_out}")
 
 
 if __name__ == "__main__":
-    # Simple command-line argument handling
-    if len(sys.argv) < 3:
-        print("Usage: python extract_residues.py <pdb_file> <traj_file>")
-        sys.exit(1)
-
-    pdb_file = sys.argv[1]
-    traj_file = sys.argv[2]
-
-    # Output filename in the same directory:
-    output_json = "residues_data_active_full.json"
-
-    # You can adjust the residue range as needed
-    # For example, here we pick 1 to 278, inclusive
-    rotamers = list(range(1, 279))
-    # New: Automatically include all residues in the PDB
-    #rotamers = sorted(set(pdb.resseq.tolist()))
-
-
-    # Process the trajectory and compute dihedrals
-    residues = process_trajectory(
-        pdb_file=pdb_file,
-        traj_file=traj_file,
-        rotamers=rotamers,
-        higher_order='all'  # 'all' for side-chain dihedrals up to chi5
-    )
-
-    # Serialize
-    serialized_residues = serialize_residues(residues)
-
-    # Write to JSON in the same folder
-    with open(output_json, 'w') as f:
-        json.dump(serialized_residues, f, indent=2)
-
-    print(f"Finished! Wrote JSON data to {output_json}")
+    cli()
