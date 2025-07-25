@@ -2,144 +2,350 @@
 
 ## Overview
 
-This repository provides a set of Python utilities for analysing, comparing, and converting protein-structure data. The tools are optimised for datasets originating from molecular-dynamics (MD) simulations and generative models such as LD-FPG.
+This repository contains a collection of Python scripts designed for in-depth analysis, comparison, and format conversion of protein structure data. These tools are particularly useful for processing outputs from Molecular Dynamics (MD) simulations or generative models like LD-FPG. The toolkit allows for:
 
-### Key Capabilities
+* Detailed dihedral angle distribution analysis and comparison across multiple datasets.
+* Calculation of structural similarity scores (lDDT, TM-score).
+* Extraction of coordinate and dihedral data from trajectories.
+* Conversion between various file formats (HDF5, PDB, XTC, NPY, JSON).
 
-- Per-residue heavy-atom extraction and dihedral analysis
-- Structural similarity metrics (lDDT, TM-score)
-- Multi-ensemble dihedral-distribution comparisons with rich visualisation and CSV export
-- Format conversion between HDF5, PDB, XTC, NPY and JSON
+## Scripts Overview
 
-## Script Summary
+Here's a brief summary of each script:
 
-| Script | Purpose |
-|--------|---------|
-| `extract_residues.py` | **NEW v2**: Extract heavy atoms & dihedral angles from a trajectory with optional frame sub-sampling (`--fraction`) and automatic export of a heavy-atom-only PDB (`heavy_chain.pdb`) |
-| `condense_residues.py` | Remap atom indices in the JSON from `extract_residues.py` to a contiguous 0-based scheme for downstream analysis |
-| `CompareDihedrals_csv.py` | Comprehensive three-way dihedral comparison (plots + metrics + per-plot CSV) |
-| `CompareDihedrals.py` | Legacy variant of the above (plots & metrics, no CSV) |
-| `calc_lddt.py` | Compute lDDT between predicted structures (HDF5) and a reference |
-| `calc_tm.py` | Compute TM-score between predicted structures and a reference |
-| `h5_to_pdb.py` | Convert coordinate ensembles in HDF5 to individual PDBs |
-| `json_to_pdb.py` | Convert the first frame of a detailed JSON to PDB + DAT |
-| `npy_to_pdb.py` | Convert NumPy coordinate arrays to PDBs |
-| `npy_to_xtc.py` | Convert NumPy coordinate arrays to an XTC trajectory |
-| `pdbs_to_xtc.py` | Stitch a series of PDB files into a single XTC trajectory |
+* **extract_residues.py**: **NEW v2**: Processes PDB and MD trajectory files (DCD, XTC) to extract per-residue heavy atom coordinates and calculate dihedral angles over time, saving to a detailed JSON format. Now includes optional frame sub-sampling (`--fraction`) and automatic export of a heavy-atom-only PDB (`heavy_chain.pdb`).
+* **condense_residues.py**: Takes the JSON output from extract_residues.py and creates a "condensed" JSON file with remapped, contiguous 0-based atom indices. This condensed file defines backbone/sidechain atoms and torsion angle quadruplets using these new indices, crucial for consistent downstream analysis.
+* **CompareDihedrals_csv.py**: Performs comprehensive dihedral angle analysis by comparing three HDF5 coordinate ensembles. It generates global and per-residue dihedral distribution plots (scatter plots, 1D/2D histograms, heatmaps), calculates various statistical metrics (KL divergence, JS divergence, Wasserstein distance) for pairwise comparisons, and **exports data for every generated plot into corresponding CSV files**. It also compiles plots into a summary PDF.
+* **CompareDihedrals.py**: Similar to CompareDihedrals_csv.py, this script also performs dihedral analysis comparing three HDF5 files, including global plots, per-residue KL analysis, and calculation of 1D/2D metrics. It's recommended to use CompareDihedrals_csv.py for the most comprehensive output including per-plot CSV data.
+* **calc_lddt.py**: Calculates Local Distance Difference Test (lDDT) scores between a set of predicted structures (from an HDF5 file) and a reference structure. Supports backbone-only calculations and random subsampling of structures.
+* **calc_tm.py**: Calculates TM-scores between predicted structures (HDF5) and a reference structure. Also supports backbone-only mode and subsampling.
+* **h5_to_pdb.py**: Converts ensembles of protein structures stored in HDF5 format into individual PDB files, using a template PDB for atom information.
+* **json_to_pdb.py**: Extracts the first frame of heavy atom data from the JSON output of extract_residues.py and writes it as a PDB file and a simple .dat file (listing atom information and coordinates).
+* **npy_to_pdb.py**: Converts coordinate data stored in a NumPy .npy file into multiple PDB files, using a template PDB.
+* **npy_to_xtc.py**: Converts coordinate data from a .npy file into an XTC trajectory file, using a PDB file for topology information.
+* **pdbs_to_xtc.py**: Creates a single XTC trajectory file from a numerically sorted series of individual PDB files.
 
-## Detailed Descriptions & Usage
+---
 
-### 1. extract_residues.py (version 2)
+## ⚙️ General Prerequisites
 
-**Purpose**: Extract per-residue heavy-atom coordinates and backbone/side-chain dihedral angles from a PDB + trajectory pair, saving the result as structured JSON and writing a hydrogen-stripped PDB (`heavy_chain.pdb`).
-
-#### Key Features
-
-| Feature | Notes |
-|---------|-------|
-| Frame sub-sampling | `--fraction <F>` keeps roughly F × 100% of frames (uniform stride). `--fraction 1.0` ⇒ keep all frames |
-| Automatic residue detection | All residues present in the PDB are processed (no hard-coded range) |
-| Heavy-atom PDB export | A clean heavy-only topology (`heavy_chain.pdb`) is produced and can be reused by other scripts |
-| Side-chain χ-angles | χ1-χ5 calculated when defined for the residue type |
-| JSON output | Default `residues_data.json`; customizable via `--json_out` |
-
-#### CLI Usage
-
+* **Python 3.x**
+* **Core Libraries:**
+    * NumPy
+    * SciPy (for 1D Wasserstein distance)
+    * h5py (for HDF5 file I/O)
+    * PyTorch
+    * MDAnalysis (for extract_residues.py, npy_to_xtc.py)
+    * Matplotlib (for plotting)
+    * Seaborn (for enhanced plotting)
+    * img2pdf (for compiling plots into PDF)
+    * POT (Python Optimal Transport) library (optional, for 2D Wasserstein distance in CompareDihedrals_csv.py and CompareDihedrals.py). Install with pip install pot.
+    
 ```bash
-python extract_residues.py \
-    --pdb  system.pdb \
-    --traj system.xtc \
-    --fraction 0.20            # keep 20% of frames
-    --json_out residues.json    # optional
-    --pdb_out  heavy_chain.pdb  # optional
+# Example installation
+pip install numpy scipy h5py torch mdanalysis matplotlib seaborn img2pdf
+pip install pot  # Optional, for 2D Wasserstein
 ```
 
-#### Outputs
+* **Input Data:** Specific scripts will require input data such as PDB files, trajectory files (DCD, XTC), HDF5 files with coordinates, JSON files from other scripts in this toolkit, or NumPy arrays.
 
-- `heavy_chain.pdb` – heavy atoms only, original serial numbers preserved
-- `residues.json` – hierarchical JSON with:
-  - Heavy-atom indices & time-series coordinates
-  - φ / ψ / χn dihedral lists synchronised with the selected frames
+---
 
-> **Tip**: A smaller JSON can be generated instantly by adjusting `--fraction`, e.g. `--fraction 0.05` (≈ every 20th frame).
+## 🛠️ Detailed Script Descriptions and Usage
+
+### 1. extract_residues.py
+
+* **Purpose:** Processes PDB and MD trajectory files (DCD, XTC) to extract per-residue heavy atom coordinates and calculate dihedral angles over time, saving to a detailed JSON format. **NEW v2**: Now includes optional frame sub-sampling (`--fraction`) and automatic export of a heavy-atom-only PDB (`heavy_chain.pdb`).
+
+* **Key Features:**
+    * **Frame sub-sampling**: `--fraction <F>` keeps roughly F × 100% of frames (uniform stride). `--fraction 1.0` ⇒ keep all frames.
+    * **Automatic residue detection**: All residues present in the PDB are processed (no hard-coded range).
+    * **Heavy-atom PDB export**: A clean heavy-only topology (`heavy_chain.pdb`) is produced and can be reused by other scripts.
+    * **Side-chain χ-angles**: χ1-χ5 calculated when defined for the residue type.
+    * **JSON output**: Default `residues_data.json`; customizable via `--json_out`.
+
+* **Key Inputs:**
+    * `--pdb`: Path to PDB file (topology).
+    * `--traj`: Path to trajectory file (e.g., .dcd, .xtc).
+    * `--fraction` (optional): Fraction of frames to keep (default: 1.0 = all frames).
+    * `--json_out` (optional): Output JSON filename (default: residues_data.json).
+    * `--pdb_out` (optional): Output heavy-atom PDB filename (default: heavy_chain.pdb).
+
+* **Key Outputs:**
+    * `heavy_chain.pdb` – heavy atoms only, original serial numbers preserved.
+    * `residues.json` – hierarchical JSON with heavy-atom indices & time-series coordinates, φ / ψ / χn dihedral lists synchronised with the selected frames.
+
+* **Usage Example:**
+    ```bash
+    python extract_residues.py \
+        --pdb  system.pdb \
+        --traj system.xtc \
+        --fraction 0.20            # keep 20% of frames
+        --json_out residues.json    # optional
+        --pdb_out  heavy_chain.pdb  # optional
+    ```
+    **Tip**: A smaller JSON can be generated instantly by adjusting `--fraction`, e.g. `--fraction 0.05` (≈ every 20th frame).
 
 ### 2. condense_residues.py
 
-**Purpose**: Convert the detailed JSON from `extract_residues.py` into a compact representation with contiguous atom indices. Essential for consistent input to `CompareDihedrals_csv.py` / `CompareDihedrals.py`.
+* **Purpose:** Processes the JSON output from extract_residues.py to create a "condensed" JSON file. This new file features:
+    * Residues and atoms re-indexed contiguously starting from 0.
+    * Clear distinction between backbone and sidechain atoms using the new indices.
+    * Definitions for φ, ψ, and χn torsion angles using these new, contiguous atom indices.
+    This standardized format is essential for consistent input to dihedral analysis scripts.
 
-```bash
-python condense_residues.py residues.json condensed_residues.json
-```
+* **Key Inputs:**
+    * `input_json`: Path to JSON file generated by extract_residues.py (e.g., residues_data_active_full.json).
+    * `output_json`: Path for the condensed JSON file (e.g., condensed_residues.json).
 
-### 3. CompareDihedrals_csv.py (recommended)
+* **Key Output:**
+    * Condensed JSON file with remapped, contiguous 0-based atom indices.
 
-Comprehensive three-way comparison of dihedral distributions with per-plot CSV export, KL/JS/Wasserstein metrics and publication-ready figures. See inline `--help` for the extensive list of options.
+* **Usage Example:**
+    ```bash
+    python condense_residues.py residues_data_active_full.json condensed_residues.json
+    ```
 
-```bash
-python CompareDihedrals_csv.py \
-    --condensed_json condensed_residues.json \
-    --h5_1 native.h5  --h5_2 model_A.h5  --h5_3 model_B.h5 \
-    --labels Native ModelA ModelB \
-    --out_dir dihedral_results
-```
+### 3. CompareDihedrals_csv.py (Recommended for Dihedral Analysis)
 
-*Note: `CompareDihedrals.py` provides similar functionality without per-plot CSVs.*
+* **Purpose:** Provides a comprehensive comparison of dihedral angle distributions from three different structural ensembles (provided as HDF5 files containing coordinates). It performs:
+    * Global dihedral distribution plotting (individual and overlaid scatter plots, 1D histograms for φ, ψ, χn, and 2D Ramachandran plots).
+    * Pairwise per-residue Kullback-Leibler (KL) divergence analysis, visualized as heatmaps and summary bar plots.
+    * Calculation of additional 1D metrics (JS divergence, Wasserstein distance) and 2D Ramachandran metrics (KL, JS, and optional 2D Wasserstein if POT is installed) for global pairwise comparisons.
+    * **Crucially, exports the data underlying every generated plot into a corresponding CSV file**, facilitating further analysis and re-plotting.
+    * Compiles plots into summary PDFs.
 
-### 4-10. Other Utilities
+* **Key Inputs:**
+    * `--condensed_json`: Path to the condensed_residues.json file (output of condense_residues.py).
+    * `--h5_1`, `--h5_2`, `--h5_3`: Paths to three HDF5 files containing coordinate ensembles (e.g., ground truth, model A predictions, model B predictions). Each HDF5 file should contain a dataset of coordinates with shape (N_frames, N_atoms, 3).
+    * `--labels`: Three labels for the HDF5 datasets, used in plot legends and filenames.
+    * `--out_dir`: Output directory for results.
+    * `--device` (optional): Use 'cuda' if available for faster processing.
 
-- `calc_lddt.py` – local similarity metric (supports backbone-only mode)
-- `calc_tm.py` – global TM-score metric (supports backbone-only mode)
-- `h5_to_pdb.py` – write PDB snapshots from an HDF5 coordinate ensemble
-- `json_to_pdb.py` – dump the first JSON frame to PDB/DAT
-- `npy_to_pdb.py` – write PDB snapshots from a NumPy array
-- `npy_to_xtc.py` – turn a NumPy array into an XTC trajectory
-- `pdbs_to_xtc.py` – merge a series of PDBs into an XTC trajectory
+* **Key Outputs (within `--out_dir`):**
+    * Subdirectories for global comparisons (global_compare/individual/, global_compare/combined/) containing PNG plots and their associated CSV data files.
+    * A compiled PDF (global_compare/Global_Distributions.pdf).
+    * Subdirectories for each pairwise comparison (e.g., KL_Set1_vs_Set2/) containing:
+        * Per-residue KL divergence heatmaps (PNGs + CSVs).
+        * Summary plots of top differing residues/angles (PNGs + CSVs).
+        * Detailed overlay plots for top differing residues (PNGs + CSVs).
+        * A CSV file (kl_data.csv) with the full per-residue, per-angle KL matrix.
+        * A compiled PDF for the pairwise comparison (e.g., KL_Set1_vs_Set2.pdf).
+    * CSV files (Global_Metrics_LabelA_vs_LabelB.csv) summarizing global 1D and 2D dihedral metrics for each pair.
 
-Each script has an inline `--help` with examples.
+* **Usage Example:**
+    ```bash
+    python CompareDihedrals_csv.py \
+        --condensed_json helper/condensed_residues.json \
+        --h5_1 structures/ground_truth.h5 \
+        --h5_2 structures/model_A_coords.h5 \
+        --h5_3 structures/model_B_coords.h5 \
+        --labels "GroundTruth" "ModelA" "ModelB" \
+        --out_dir dihedral_analysis_results \
+        --device cuda  # Optional: use 'cuda' if available
+    ```
 
-## Prerequisites
+* **Note on CompareDihedrals.py**: This script offers similar analytical capabilities to CompareDihedrals_csv.py for plotting and metric calculation. However, CompareDihedrals_csv.py is generally recommended due to its explicit design for exporting CSV data alongside every generated plot, enhancing data accessibility and reproducibility.
 
-```bash
-pip install numpy scipy h5py torch mdanalysis matplotlib seaborn img2pdf
-# Optional (2D Wasserstein in dihedral comparison)
-pip install pot
-```
+### 4. calc_lddt.py
 
-Python ≥ 3.8 is recommended.
+* **Purpose:** Calculates the Local Distance Difference Test (lDDT) score, a measure of local structural similarity, by comparing predicted structures to a reference structure.
 
-## Example Workflow 🚀
+* **Key Inputs:**
+    * `--h5file`: Path to an HDF5 file containing predicted coordinates (shape (N_structures, N_atoms, 3) or (N_structures * N_atoms, 3) which will be reshaped).
+    * `--xref`: Path to the reference structure coordinates (.npy or .pt file, shape (N_atoms, 3)).
+    * `--key` (optional): Specific dataset key within the HDF5 file. If not provided, the script attempts to use the first key found.
+    * `--backbone_only` (flag): If set, calculates lDDT on backbone atoms only. Requires `--pdb`.
+    * `--pdb` (optional): Path to a PDB file used to define backbone atom indices if `--backbone_only` is active.
+    * `--max_samples` (optional): If greater than 0, randomly samples this many structures from the HDF5 file for lDDT calculation.
+    * `--seed` (optional): Random seed for reproducible sampling.
 
-1. **Extract heavy-atom data & dihedrals**
-   ```bash
-   python extract_residues.py --pdb prot.pdb --traj traj.xtc --fraction 0.1
-   ```
+* **Key Output:**
+    * Prints the mean and standard deviation of the lDDT scores calculated for the processed structures.
 
-2. **Condense indices**
-   ```bash
-   python condense_residues.py residues.json condensed.json
-   ```
+* **Usage Example (All-atom, sampling 100 models):**
+    ```bash
+    python calc_lddt.py \
+        --h5file structures/generated_coords.h5 \
+        --xref structures/X_ref_coords.pt \
+        --max_samples 100 \
+        --seed 42
+    ```
 
-3. **Compare three coordinate ensembles**
-   ```bash
-   python CompareDihedrals_csv.py \
-       --condensed_json condensed.json \
-       --h5_1 truth.h5 --h5_2 modelA.h5 --h5_3 modelB.h5 \
-       --labels Truth A B --out_dir analysis
-   ```
+* **Usage Example (Backbone-only):**
+    ```bash
+    python calc_lddt.py \
+        --h5file structures/generated_coords.h5 \
+        --xref structures/X_ref_coords.pt \
+        --backbone_only \
+        --pdb helper/heavy_chain.pdb
+    ```
 
-4. **Quality metrics (optional)**
-   ```bash
-   python calc_lddt.py --h5file modelA.h5 --xref ref.npy
-   python calc_tm.py   --h5file modelA.h5 --xref ref.npy
-   ```
+### 5. calc_tm.py
 
-## License
+* **Purpose:** Calculates the TM-score, a measure of global structural similarity, comparing predicted structures to a reference.
 
-Distributed under the Creative Commons Attribution 4.0 International (CC BY 4.0) licence.
+* **Key Inputs:**
+    * `--h5file`: Path to an HDF5 file containing predicted coordinates.
+    * `--xref`: Path to the reference structure coordinates (.npy or .pt file).
+    * `--key` (optional): Specific dataset key within the HDF5 file.
+    * `--backbone_only` (flag): If set, calculates TM-score on backbone atoms only. Requires `--pdb`.
+    * `--pdb` (optional): Path to a PDB file used to define backbone atom indices if `--backbone_only` is active.
+    * `--max_samples` (optional): If greater than 0, randomly samples this many structures.
+    * `--seed` (optional): Random seed for reproducible sampling.
 
-**You are free to:**
-- **Share** — copy and redistribute the material in any medium or format
-- **Adapt** — remix, transform, and build upon the material for any purpose, even commercially
+* **Key Output:**
+    * Prints the mean and standard deviation of the TM-scores.
 
-**Under the following terms:**
-- **Attribution** — You must give appropriate credit, provide a link to the licence, and indicate if changes were made
+* **Usage Example (All-atom):**
+    ```bash
+    python calc_tm.py \
+        --h5file structures/generated_coords.h5 \
+        --xref structures/X_ref_coords.pt
+    ```
+
+* **Usage Example (Backbone-only with sampling):**
+    ```bash
+    python calc_tm.py \
+        --h5file structures/generated_coords.h5 \
+        --xref structures/X_ref_coords.pt \
+        --backbone_only \
+        --pdb helper/heavy_chain.pdb \
+        --max_samples 50
+    ```
+
+### 6. h5_to_pdb.py
+
+* **Purpose:** Converts multiple protein structures stored in an HDF5 file into individual PDB files.
+
+* **Key Inputs:**
+    * `--hno_file` (optional): Path to HDF5 file from HNO reconstructions.
+    * `--decoder2_file` (optional): Path to HDF5 file from Decoder2 reconstructions (expects specific keys like reconstructions_with_override).
+    * `--pdb_file`: Path to a template PDB file whose atom information (names, residue info, etc.) will be used for formatting the output PDBs. The number of atoms in this template should match the structures in the HDF5.
+    * `--output_dir`: Root directory where subfolders for PDB files will be created.
+    * `--num_files`: Number of PDB files to generate from each input HDF5 dataset.
+
+* **Key Output:**
+    * PDB files saved in subdirectories within the specified `--output_dir`.
+
+* **Usage Example:**
+    ```bash
+    python h5_to_pdb.py \
+        --decoder2_file structures/full_coords_diff_exp1.h5 \
+        --pdb_file helper/heavy_chain.pdb \
+        --output_dir generated_pdbs \
+        --num_files 50
+    ```
+
+### 7. json_to_pdb.py
+
+* **Purpose:** Extracts the heavy atom coordinates from the **first frame** of a JSON file (typically one generated by extract_residues.py) and outputs them as a single PDB file. It also creates a simple .dat file listing residue number, residue name, atom index, atom name, and X, Y, Z coordinates.
+
+* **Key Inputs:**
+    * `json_path`: Path to the input JSON file (e.g., residues_data_active_full.json).
+    * `dat_path`: Path for the output .dat file.
+    * `pdb_path`: Path for the output .pdb file.
+
+* **Key Outputs:**
+    * A .dat file with tabular atom information.
+    * A .pdb file containing the first frame coordinates.
+
+* **Usage Example:**
+    ```bash
+    python json_to_pdb.py helper/residues_data_active_full.json output/first_frame.dat output/first_frame.pdb
+    ```
+
+### 8. npy_to_pdb.py
+
+* **Purpose:** Converts protein structure coordinates stored in a NumPy .npy file into multiple individual PDB files. Assumes the .npy file contains a 2D array that can be reshaped into (N_structures, N_atoms, 3).
+
+* **Key Inputs (modify hardcoded paths in script):**
+    * `npy_file`: Path to the input .npy file.
+    * `pdb_file`: Path to a template PDB file.
+    * `output_directory`: Directory to save the generated PDB files.
+    * `num_files`: Number of PDBs to generate.
+
+* **Key Output:**
+    * PDB files saved in the specified output directory.
+
+* **Usage:** Modify the hardcoded paths in the script and run:
+    ```bash
+    python npy_to_pdb.py
+    ```
+
+### 9. npy_to_xtc.py
+
+* **Purpose:** Converts protein structure coordinates from a NumPy .npy file into an XTC trajectory file, using a PDB file to provide the necessary topology information.
+
+* **Key Inputs (modify hardcoded paths in script):**
+    * `npy_file`: Path to the input .npy file (reshapable to (N_frames, N_atoms, 3)).
+    * `pdb_file`: Path to the PDB topology file.
+    * `output_xtc`: Path for the output XTC file.
+
+* **Key Output:**
+    * An .xtc trajectory file.
+
+* **Usage:** Modify the hardcoded paths in the script and run:
+    ```bash
+    python npy_to_xtc.py
+    ```
+
+### 10. pdbs_to_xtc.py
+
+* **Purpose:** Combines a series of individual PDB files (each representing one frame) into a single, continuous XTC trajectory file. It automatically sorts the input files numerically to ensure the correct frame order.
+
+* **Key Inputs:**
+    * `-p, --pattern`: The input PDB file pattern (e.g., 'generated_*.pdb'). **Use quotes** to ensure the pattern is passed correctly.
+    * `-o, --output`: Path for the output XTC file (e.g., 'full_trajectory.xtc').
+
+* **Key Output:**
+    * An .xtc trajectory file.
+
+* **Usage Example:**
+    ```bash
+    python pdbs_to_xtc.py --pattern "path/to/your_pdbs/generated_*.pdb" --output "trajectory.xtc"
+    ```
+
+* **Note:** The script assumes that all input PDB files contain the exact same atoms in the same order.
+
+---
+
+## 💡 Workflow Examples
+
+1. **Detailed Dihedral Analysis of MD Trajectories:**
+    * Use extract_residues.py to process your PDB and DCD/XTC trajectory into a detailed JSON.
+    * Use condense_residues.py to convert this detailed JSON into the standardized condensed_residues.json format.
+    * If you have multiple trajectories (e.g., wild-type vs. mutant, or different simulation conditions) that you've processed into HDF5 coordinate files (you might need a separate script to convert the JSON from extract_residues.py into a simple coordinate HDF5 if CompareDihedrals_csv.py expects that directly), you can then use CompareDihedrals_csv.py with the condensed_residues.json to perform a thorough comparison.
+
+2. **Evaluating Generated Structures (from LD-FPG or other models):**
+    * Assume your generative model produces an HDF5 file of coordinates (e.g., generated_structures.h5).
+    * Use calc_lddt.py and calc_tm.py to compare these generated structures against a native/reference structure (X_ref_coords.pt or .npy).
+    * Use h5_to_pdb.py to convert a subset of these generated HDF5 structures into PDB format for visualization or further analysis with other tools.
+    * Use CompareDihedrals_csv.py to compare the dihedral distributions of your generated ensemble against a ground truth MD ensemble (both in HDF5 coordinate format) and a set of experimentally determined structures (if available and converted to HDF5).
+
+---
+
+## 📝 Notes
+
+* **Data Formats:** Pay close attention to the expected input and output data formats for each script, especially the shapes of coordinate arrays in HDF5 files and the structure of JSON files.
+* **File Paths:** Many scripts use command-line arguments for file paths. Ensure these are correct. Some utility scripts (npy_to_pdb.py, npy_to_xtc.py) have hardcoded paths that you'll need to modify directly in the script.
+* **Dependencies:** Ensure all required libraries are installed. MDAnalysis is a key dependency for trajectory processing, and POT is optional but enhances CompareDihedrals_csv.py.
+
+---
+
+## 📜 License
+
+This project is licensed under the [Creative Commons Attribution 4.0 International License (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
+
+[![CC BY 4.0](https://licensebuttons.net/l/by/4.0/88x31.png)](https://creativecommons.org/licenses/by/4.0/)
+
+This means you are free to:
+* **Share** — copy and redistribute the material in any medium or format
+* **Adapt** — remix, transform, and build upon the material
+
+for any purpose, even commercially.
+
+Under the following terms:
+* **Attribution** — You must give appropriate credit, provide a link to the license, and indicate if changes were made. You may do so in any reasonable manner, but not in any way that suggests the licensor endorses you or your use.
+
+No additional restrictions — You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.
