@@ -512,7 +512,10 @@ if __name__ == "__main__":
 
     # You can adjust the residue range as needed
     # For example, here we pick 1 to 278, inclusive
-    rotamers = list(range(1, 279))
+    #rotamers = list(range(1, 279))
+    # New: Automatically include all residues in the PDB
+    rotamers = sorted(set(pdb.resseq.tolist()))
+
 
     # Process the trajectory and compute dihedrals
     residues = process_trajectory(
