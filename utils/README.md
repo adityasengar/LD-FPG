@@ -13,7 +13,9 @@ This repository contains a collection of Python scripts designed for in-depth an
 
 Here's a brief summary of each script:
 
-* **`extract_residues.py`**: Processes PDB and MD trajectory files (DCD, XTC) to extract per-residue heavy atom coordinates and calculate dihedral angles over time, saving to a detailed JSON format.
+
+
+* **`extract_residues.py`**: Extract heavy atoms & dihedral angles from a trajectory with optional frame sub-sampling (--fraction) and automatic export of a heavy-atom-only PDB (heavy_chain.pdb)
 * **`condense_residues.py`**: Takes the JSON output from `extract_residues.py` and creates a "condensed" JSON file with remapped, contiguous 0-based atom indices. This condensed file defines backbone/sidechain atoms and torsion angle quadruplets using these new indices, crucial for consistent downstream analysis.
 * **`CompareDihedrals_csv.py`**: Performs comprehensive dihedral angle analysis by comparing three HDF5 coordinate ensembles. It generates global and per-residue dihedral distribution plots (scatter plots, 1D/2D histograms, heatmaps), calculates various statistical metrics (KL divergence, JS divergence, Wasserstein distance) for pairwise comparisons, and **exports data for every generated plot into corresponding CSV files**. It also compiles plots into a summary PDF.
 * **`CompareDihedrals.py`**: Similar to `CompareDihedrals_csv.py`, this script also performs dihedral analysis comparing three HDF5 files, including global plots, per-residue KL analysis, and calculation of 1D/2D metrics. It's recommended to use `CompareDihedrals_csv.py` for the most comprehensive output including per-plot CSV data.
