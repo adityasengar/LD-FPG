@@ -13,8 +13,8 @@ This repository contains a collection of Python scripts designed for in-depth an
 
 Here's a brief summary of each script:
 
-* **extract_residues.py**: **NEW v2**: Processes PDB and MD trajectory files (DCD, XTC) to extract per-residue heavy atom coordinates and calculate dihedral angles over time, saving to a detailed JSON format. Now includes optional frame sub-sampling (`--fraction`) and automatic export of a heavy-atom-only PDB (`heavy_chain.pdb`).
-* **condense_residues.py**: Takes the JSON output from extract_residues.py and creates a "condensed" JSON file with remapped, contiguous 0-based atom indices. This condensed file defines backbone/sidechain atoms and torsion angle quadruplets using these new indices, crucial for consistent downstream analysis.
+* **extract_residues.py**: **NEW v2**: Processes PDB and MD trajectory files (DCD, XTC) to extract per-residue heavy atom coordinates and calculate dihedral angles over time, saving to a detailed JSON format. Now includes optional frame sub-sampling (`--fraction`), automatic export of a heavy-atom-only PDB (`heavy_chain.pdb`), and **optionally writes a condensed JSON** with contiguous atom indices (`--condensed_out`) suitable for direct input to comparison scripts.
+* **condense_residues.py**: (legacy/optional) Takes the JSON output from older versions of extract_residues.py and creates a "condensed" JSON file with remapped, contiguous 0-based atom indices. **Not required if you use `--condensed_out` in extract_residues.py v2**.
 * **CompareDihedrals_csv.py**: Performs comprehensive dihedral angle analysis by comparing three HDF5 coordinate ensembles. It generates global and per-residue dihedral distribution plots (scatter plots, 1D/2D histograms, heatmaps), calculates various statistical metrics (KL divergence, JS divergence, Wasserstein distance) for pairwise comparisons, and **exports data for every generated plot into corresponding CSV files**. It also compiles plots into a summary PDF.
 * **CompareDihedrals.py**: Similar to CompareDihedrals_csv.py, this script also performs dihedral analysis comparing three HDF5 files, including global plots, per-residue KL analysis, and calculation of 1D/2D metrics. It's recommended to use CompareDihedrals_csv.py for the most comprehensive output including per-plot CSV data.
 * **calc_lddt.py**: Calculates Local Distance Difference Test (lDDT) scores between a set of predicted structures (from an HDF5 file) and a reference structure. Supports backbone-only calculations and random subsampling of structures.
@@ -55,48 +55,51 @@ pip install pot  # Optional, for 2D Wasserstein
 
 ### 1. extract_residues.py
 
-* **Purpose:** Processes PDB and MD trajectory files (DCD, XTC) to extract per-residue heavy atom coordinates and calculate dihedral angles over time, saving to a detailed JSON format. **NEW v2**: Now includes optional frame sub-sampling (`--fraction`) and automatic export of a heavy-atom-only PDB (`heavy_chain.pdb`).
+* **Purpose:** Processes PDB and MD trajectory files (DCD/XTC) to extract per-residue heavy atom coordinates and dihedral angles over time, saving to a detailed JSON format. **v2** now also:
+    * Supports **optional frame sub-sampling** (`--fraction`)
+    * Automatically exports a **heavy-atom-only PDB** (`heavy_chain.pdb`)
+    * **Optionally writes a condensed JSON** with contiguous atom indices (`--condensed_out`), suitable for direct input to comparison scripts
 
 * **Key Features:**
-    * **Frame sub-sampling**: `--fraction <F>` keeps roughly F × 100% of frames (uniform stride). `--fraction 1.0` ⇒ keep all frames.
-    * **Automatic residue detection**: All residues present in the PDB are processed (no hard-coded range).
-    * **Heavy-atom PDB export**: A clean heavy-only topology (`heavy_chain.pdb`) is produced and can be reused by other scripts.
-    * **Side-chain χ-angles**: χ1-χ5 calculated when defined for the residue type.
-    * **JSON output**: Default `residues_data.json`; customizable via `--json_out`.
+    * **Frame sub-sampling**: `--fraction <F>` keeps roughly F × 100% of frames (uniform stride).
+    * **Automatic residue detection**: No hard-coded residue range.
+    * **Heavy-atom PDB export**: Outputs a clean heavy-only PDB for use in further analysis.
+    * **Condensed output**: Add `--condensed_out condensed.json` to create a compact, contiguous-index JSON (previously required a separate script).
+    * **Side-chain χ-angles**: χ1-χ5 calculated when possible.
+    * **Flexible output names**: `--json_out`, `--pdb_out`, `--condensed_out`.
 
-* **Key Inputs:**
-    * `--pdb`: Path to PDB file (topology).
-    * `--traj`: Path to trajectory file (e.g., .dcd, .xtc).
-    * `--fraction` (optional): Fraction of frames to keep (default: 1.0 = all frames).
-    * `--json_out` (optional): Output JSON filename (default: residues_data.json).
-    * `--pdb_out` (optional): Output heavy-atom PDB filename (default: heavy_chain.pdb).
+* **Inputs:**
+    * `--pdb`: PDB file (topology).
+    * `--traj`: Trajectory file (.xtc, .dcd, etc.).
+    * `--fraction` (optional, default 1.0): Fraction of frames to keep.
+    * `--json_out` (optional): Output JSON file (default: residues_data.json).
+    * `--pdb_out` (optional): Output heavy atom PDB (default: heavy_chain.pdb).
+    * `--condensed_out` (optional): Output condensed JSON (for comparison/analysis).
 
-* **Key Outputs:**
-    * `heavy_chain.pdb` – heavy atoms only, original serial numbers preserved.
-    * `residues.json` – hierarchical JSON with heavy-atom indices & time-series coordinates, φ / ψ / χn dihedral lists synchronised with the selected frames.
+* **Outputs:**
+    * `heavy_chain.pdb` — heavy-atom-only PDB
+    * `residues_data.json` — full time-series JSON with per-frame heavy atom coords and torsions
+    * `condensed.json` (optional) — **compact, remapped atom index JSON** (for dihedral comparison)
 
 * **Usage Example:**
     ```bash
     python extract_residues.py \
-        --pdb  system.pdb \
-        --traj system.xtc \
-        --fraction 0.20            # keep 20% of frames
-        --json_out residues.json    # optional
-        --pdb_out  heavy_chain.pdb  # optional
+        --pdb prot.pdb \
+        --traj traj.xtc \
+        --fraction 0.05 \
+        --json_out residues_full.json \
+        --pdb_out heavy_chain.pdb \
+        --condensed_out condensed.json
     ```
-    **Tip**: A smaller JSON can be generated instantly by adjusting `--fraction`, e.g. `--fraction 0.05` (≈ every 20th frame).
+    **Note:** You no longer need `condense_residues.py` for new workflows—just use the `--condensed_out` flag!
 
-### 2. condense_residues.py
+### 2. condense_residues.py (legacy/optional)
 
-* **Purpose:** Processes the JSON output from extract_residues.py to create a "condensed" JSON file. This new file features:
-    * Residues and atoms re-indexed contiguously starting from 0.
-    * Clear distinction between backbone and sidechain atoms using the new indices.
-    * Definitions for φ, ψ, and χn torsion angles using these new, contiguous atom indices.
-    This standardized format is essential for consistent input to dihedral analysis scripts.
+* **Purpose:** For legacy workflows, converts JSON from older versions of extract_residues.py into a "condensed" JSON file with remapped, contiguous 0-based atom indices. **Not required if you use `--condensed_out` in extract_residues.py v2**.
 
 * **Key Inputs:**
-    * `input_json`: Path to JSON file generated by extract_residues.py (e.g., residues_data_active_full.json).
-    * `output_json`: Path for the condensed JSON file (e.g., condensed_residues.json).
+    * `input_json`: Path to JSON file generated by older versions of extract_residues.py.
+    * `output_json`: Path for the condensed JSON file.
 
 * **Key Output:**
     * Condensed JSON file with remapped, contiguous 0-based atom indices.
@@ -313,15 +316,16 @@ pip install pot  # Optional, for 2D Wasserstein
 ## 💡 Workflow Examples
 
 1. **Detailed Dihedral Analysis of MD Trajectories:**
-    * Use extract_residues.py to process your PDB and DCD/XTC trajectory into a detailed JSON.
-    * Use condense_residues.py to convert this detailed JSON into the standardized condensed_residues.json format.
-    * If you have multiple trajectories (e.g., wild-type vs. mutant, or different simulation conditions) that you've processed into HDF5 coordinate files (you might need a separate script to convert the JSON from extract_residues.py into a simple coordinate HDF5 if CompareDihedrals_csv.py expects that directly), you can then use CompareDihedrals_csv.py with the condensed_residues.json to perform a thorough comparison.
+    * Use extract_residues.py to process your PDB and DCD/XTC trajectory into a detailed JSON. Use `--condensed_out` to also generate the condensed JSON directly.
+    * (Or, if using extract_residues.py v2, simply use the `--condensed_out` option to generate this directly instead of running condense_residues.py separately.)
+    * If you have multiple trajectories (e.g., wild-type vs. mutant, or different simulation conditions) that you've processed into HDF5 coordinate files, you can then use CompareDihedrals_csv.py with the condensed JSON to perform a thorough comparison.
 
 2. **Evaluating Generated Structures (from LD-FPG or other models):**
     * Assume your generative model produces an HDF5 file of coordinates (e.g., generated_structures.h5).
     * Use calc_lddt.py and calc_tm.py to compare these generated structures against a native/reference structure (X_ref_coords.pt or .npy).
     * Use h5_to_pdb.py to convert a subset of these generated HDF5 structures into PDB format for visualization or further analysis with other tools.
     * Use CompareDihedrals_csv.py to compare the dihedral distributions of your generated ensemble against a ground truth MD ensemble (both in HDF5 coordinate format) and a set of experimentally determined structures (if available and converted to HDF5).
+    * Note: If using extract_residues.py v2 with `--condensed_out`, you can reference the condensed JSON output directly in CompareDihedrals_csv.py.
 
 ---
 
