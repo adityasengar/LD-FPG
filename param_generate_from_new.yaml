@@ -1,0 +1,50 @@
+# ===================================================================
+# Configuration for Generating Embeddings from a Novel PDB
+# ===================================================================
+
+# --- Input & Output Paths ---
+paths:
+  # Path to the PRE-TRAINED HNO encoder checkpoint from the chebnet_conditional_setup.py run.
+  hno_checkpoint_path: "checkpoints/hno_checkpoint.pth"
+  
+  # Path to the PRE-TRAINED conditional diffusion model checkpoint.
+  diffusion_checkpoint_path: "conditional_diffusion_output/checkpoints/cond_diffusion_latest.pth"
+  
+  # --- CRUCIAL: Canonical Reference ---
+  # Path to the FIRST PDB file that was used to train the original models.
+  # This is required to align the new PDB into the same coordinate system.
+  canonical_reference_pdb: "/scratch/asengar/long_sim/apo_d2_inv_start/run6/heavy_chain.pdb"
+
+
+# --- Model Architecture Parameters ---
+# These parameters MUST EXACTLY MATCH the parameters used during the original training runs.
+
+hno_encoder:
+  hidden_dim: 16
+  cheb_order: 4
+  knn_value: 4
+
+diffusion_model:
+  # The dimension of the pooled latent embeddings.
+  # This is calculated as decoder2_settings.output_height * decoder2_settings.output_width from the training config.
+  data_dim: 100
+  
+  # The feature dimension of the z_ref conditioner (e.g., 16).
+  cond_input_dim: 16 # This should match hno_encoder.hidden_dim
+  
+  # The fixed-size dimension of the encoded conditioner.
+  cond_encoded_dim: 256
+  
+  # Width of the main diffusion MLP layers.
+  hidden_dim: 2048
+  
+  # Diffusion timestep parameters.
+  diffusion_steps: 1000
+  beta_start: 0.0001
+  beta_end: 0.02
+
+
+# --- Generation Settings ---
+generation_settings:
+  # Number of new pooled embedding samples to generate from the novel PDB.
+  num_gen: 500

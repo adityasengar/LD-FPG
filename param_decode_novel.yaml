@@ -1,0 +1,29 @@
+# ===================================================================
+# Configuration for Decoding Novel Latent Embeddings
+# ===================================================================
+
+paths:
+  # Path to the PRE-TRAINED decoder model checkpoint from the chebnet_conditional_setup.py run.
+  decoder_checkpoint_path: "checkpoints/decoder2_checkpoint.pth"
+
+# --- Decoder Model Settings ---
+# These parameters MUST EXACTLY MATCH the parameters used to train the decoder
+# in the chebnet_conditional_setup.py script (defined in its param_conditional.yaml).
+decoder2_settings:
+  # The dimensionality of the dynamic per-atom embeddings from the HNO encoder.
+  # This corresponds to hno_encoder.hidden_dim in the training config.
+  node_emb_dim: 16
+  
+  # The dimensionality of the static z_ref conditioner embeddings.
+  # This also corresponds to hno_encoder.hidden_dim.
+  cond_emb_dim: 16
+  
+  # The dimensions of the 2D pooling layer.
+  output_height: 50
+  output_width: 2
+  
+  # The dimensionality of the hidden layers within the final MLP decoder.
+  mlp_hidden_dim: 16
+  
+  # The number of hidden layers in the final MLP decoder.
+  num_hidden_layers: 12

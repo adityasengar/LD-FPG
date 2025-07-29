@@ -1,0 +1,59 @@
+# ===================================================================
+# Conditional Diffusion Model Configuration
+# ===================================================================
+
+# --- Data Paths ---
+# These paths point to the HDF5 files produced by the chebnet_conditional_setup.py script.
+data:
+  # Path to the HDF5 file containing the dynamic, frame-by-frame pooled embeddings.
+  embeddings_h5_path: "latent_reps/pooled_embeddings.h5"
+  
+  # Path to the HDF5 file containing the static reference conditioners (z_ref).
+  conditioners_h5_path: "latent_reps/reference_conditioners.h5"
+  
+  # Template for the group name within the HDF5 files. '{}' is replaced by the system ID.
+  group_key_template: "system_{}"
+  
+  # Name of the dataset within each group for the embeddings.
+  embedding_dataset_name: "embeddings"
+  
+  # Name of the dataset within each group for the single reference conditioner.
+  conditioner_dataset_name: "z_ref"
+  
+  # Name of the dataset within each group for the ensemble of conditioners.
+  conditioner_ensemble_dataset_name: "z_ref_ensemble"
+
+# --- Output Directory ---
+# Directory to save generated embeddings and model checkpoints.
+output_dir: "conditional_diffusion_output"
+
+
+# --- Model & Training Parameters ---
+parameters:
+  # --- Augmentation Control ---
+  # If true, the script will load the conditioner ensemble and randomly sample from it during training.
+  # This makes the model more robust to noise in the conditioner.
+  use_conditioner_ensemble: true
+
+  # --- Core Training ---
+  num_epochs: 100
+  batch_size: 128
+  learning_rate: 1e-5
+  
+  # Number of new embedding samples to generate for each conditioner.
+  num_gen: 1000
+  
+  # Frequency (in epochs) to save a model checkpoint.
+  save_interval: 2000
+  
+  # --- Model Architecture ---
+  model_type: "mlp_conditional_cnn_encoder" # For reference
+  hidden_dim: 2048              # Width of the main MLP layers
+  conditioner_encoded_dim: 256  # Dimension of the fixed-size vector from the CNN encoder
+  
+  # --- Diffusion Schedule ---
+  scheduler: "linear"
+  diffusion_steps: 1000
+  beta_start: 0.0001
+  beta_end: 0.02
+
