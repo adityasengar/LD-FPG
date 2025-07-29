@@ -1,0 +1,54 @@
+# ===================================================================
+# Diffusion Model Configuration for Multi-System Pooled Embeddings
+# ===================================================================
+
+# --- Execution Target ---
+# Specify which system's embeddings to train the diffusion model on.
+# This corresponds to the group name in the HDF5 file (e.g., 0 for 'system_0').
+system_to_train: 0
+
+# --- Data Paths ---
+# Path to the HDF5 file containing the pooled embeddings from the multi-system ChebNet script.
+h5_file_path: "latent_reps/pooled_embeddings.h5"
+# Template for the group name within the HDF5 file. The script will replace '{}' with 'system_to_train'.
+dataset_group_key_template: "system_{}"
+# Name of the dataset within each group.
+dataset_name_in_group: "embeddings"
+# Directory to save generated embeddings and checkpoints.
+output_dir: "diffusion_output"
+
+
+# --- Run Mode & Grid Search ---
+# 'user_defined': Runs a single experiment with the parameters in the 'parameters' section.
+# 'grid_search': Runs a series of experiments defined in 'grid_search_space'.
+run_mode: "grid_search"
+
+# --- Parameters for a single run (if run_mode is 'user_defined') ---
+parameters:
+  num_epochs: 50
+  batch_size: 64
+  learning_rate: 1e-5
+  num_gen: 5000
+  save_interval: 1000
+  model_type: "mlp_v2"
+  hidden_dim: 1024
+  scheduler: "linear"
+  diffusion_steps: 1400
+  beta_start: 5e-6
+  beta_end: 0.03
+  num_instances: 6 # For partitioning grid search experiments
+
+# --- Hyperparameter space for grid search (if run_mode is 'grid_search') ---
+grid_search_space:
+  # These parameters will be fixed across all grid search experiments
+  # To vary them, you would need to add them to the 'curated_experiments' in the script.
+  learning_rate: 1e-5
+  num_epochs: 50
+  model_type: "mlp_v2"
+  hidden_dim: 1024
+
+  # The script will generate a curated grid based on these values.
+  # This section is for reference; the actual grid is built in the python script.
+  example_beta_starts: [5e-6, 0.005]
+  example_beta_ends: [0.03, 0.1]
+  example_diffusion_steps: [500, 1400]

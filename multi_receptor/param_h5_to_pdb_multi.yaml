@@ -1,0 +1,33 @@
+# ===================================================================
+# Configuration for HDF5 to PDB Conversion (Multi-System)
+# ===================================================================
+
+paths:
+  # Full path to the HDF5 file containing the final generated 3D structures.
+  # This is the output from the chebnet_gen_multi.py script.
+  generated_h5_path: "generated_structures/multi_system_generated_coords.h5"
+  
+  # Directory where the new PDB files will be saved.
+  # A sub-directory will be created for each system (e.g., 'system_0', 'system_1').
+  pdb_output_dir: "generated_pdbs/"
+  
+  # --- CRUCIAL: PDB Templates ---
+  # This list provides the original PDB files that correspond to each system ID.
+  # The order is important: the first path corresponds to System ID 0, the second to System ID 1, and so on.
+  # This is required to get the correct atom names, residue info, etc.
+  # You must list ALL original PDBs that were used in the chebnet_multi_final.py run.
+  template_pdb_paths:
+    - "/scratch/asengar/long_sim/apo_d2_inv_start/run6/heavy_chain.pdb"  # Corresponds to system_0
+    - "/scratch/asengar/long_sim/apo_d1/run1/heavy_chain.pdb"      # Corresponds to system_1
+    - "/scratch/asengar/long_sim/apo_A2AR/run1/heavy_chain.pdb"    # Corresponds to system_2
+    - "/scratch/asengar/long_sim/apo_beta1/run1/heavy_chain.pdb"   # Corresponds to system_3
+    - "/scratch/asengar/long_sim/apo_M1/heavy_chain.pdb"           # Corresponds to system_4
+    # Add more paths here if you trained on more than 5 systems...
+    # - "/path/to/system_5.pdb"
+    # - "/path/to/system_6.pdb"
+
+
+settings:
+  # The maximum number of PDB files to save for each system.
+  # If a system has 5000 generated frames, this will limit the output to the first 100.
+  max_frames_to_save: 100
