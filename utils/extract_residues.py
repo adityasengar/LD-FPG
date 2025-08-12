@@ -101,20 +101,43 @@ def dihedral_deg(coords: np.ndarray) -> float:
 
 
 # -----------------------------------------------------------------------------
-# χ‑angle templates (truncated; extend as needed)
+# χ‑angle templates
 # -----------------------------------------------------------------------------
 _CHI_TEMPL = {
-    "ARG": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "CD"]},
+    "ARG": {
+        "chi1": "CG",
+        "chi2": ["CA", "CB", "CG", "CD"],
+        "chi3": ["CB", "CG", "CD", "NE"],
+        "chi4": ["CG", "CD", "NE", "CZ"],
+        "chi5": ["CD", "NE", "CZ", "NH1"],
+    },
     "ASN": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "OD1"]},
     "ASP": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "OD1"]},
     "CYS": {"chi1": "SG"},
-    "GLN": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "CD"]},
-    "GLU": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "CD"]},
+    "GLN": {
+        "chi1": "CG",
+        "chi2": ["CA", "CB", "CG", "CD"],
+        "chi3": ["CB", "CG", "CD", "OE1"],
+    },
+    "GLU": {
+        "chi1": "CG",
+        "chi2": ["CA", "CB", "CG", "CD"],
+        "chi3": ["CB", "CG", "CD", "OE1"],
+    },
     "HIS": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "ND1"]},
     "ILE": {"chi1": "CG1", "chi2": ["CA", "CB", "CG1", "CD1"]},
     "LEU": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "CD1"]},
-    "LYS": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "CD"]},
-    "MET": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "SD"]},
+    "LYS": {
+        "chi1": "CG",
+        "chi2": ["CA", "CB", "CG", "CD"],
+        "chi3": ["CB", "CG", "CD", "CE"],
+        "chi4": ["CG", "CD", "CE", "NZ"],
+    },
+    "MET": {
+        "chi1": "CG",
+        "chi2": ["CA", "CB", "CG", "SD"],
+        "chi3": ["CB", "CG", "SD", "CE"],
+    },
     "PHE": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "CD1"]},
     "PRO": {"chi1": "CG", "chi2": ["CA", "CB", "CG", "CD"]},
     "SER": {"chi1": "OG"},
