@@ -98,3 +98,64 @@ To effectively scale the training and data processing for a large number of prot
 *   **Enhanced Configuration**: The YAML configuration files (`param_gen_multi.yaml`, `param_diff.yaml`, etc.) have been updated to expose HPC-related parameters like `seed`, `num_workers`, and `num_gpus_per_node`, providing fine-grained control over resource allocation in cluster environments.
 
 *   **Multi-Process-Safe Logging**: The logging mechanism has been refined to be compatible with multi-process and distributed environments, preventing log corruption and ensuring that output from all processes is captured clearly.
+
+---
+
+## Alternative Encoder: `cuEquivariance` Model
+
+As an alternative to the `ChebConv`-based encoder, this directory also contains an implementation of an **SE(3) Equivariant Encoder** using NVIDIA's `cuEquivariance` library. This model is designed to directly learn from the 3D geometry of the protein structures, making its representations respect physical symmetries like rotation and translation.
+
+### Equivariant Components
+
+- **Encoder Model: `cueq_encoder.py`**: This file defines the `CUEQ_Encoder` class, a graph neural network built with `cuEquivariance`'s PyTorch bindings. It uses operations like segmented polynomials and tensor products to create features that are equivariant to 3D transformations.
+
+- **Training Script: `chebnet_blind_cueq.py`**: This is a standalone script for training the `CUEQ_Encoder` as an autoencoder. It learns to create a latent representation of a protein's 3D structure and then reconstruct the original coordinates from that representation. The trained model checkpoint can be used as a drop-in replacement for the original HNO encoder in downstream tasks.
+
+### How to Run the `cuEquivariance` Encoder
+
+This script is designed as a separate experiment and does not replace the main pipeline files.
+
+**Step 1: Create a YAML Configuration File**
+Create a new YAML file (e.g., `param_cueq.yaml`) and add a section for the `cueq_encoder`. The parameters define the model architecture and training settings.
+
+*Example `param_cueq.yaml`:*
+```yaml
+# Configuration for the CUEquivariance Encoder
+cueq_encoder:
+  batch_size: 16
+  num_epochs: 1000
+  learning_rate: 0.001
+  save_interval: 100
+  
+  # --- Model Architecture ---
+  # Irreducible representations for e3nn-style networks
+  in_irreps: "1x0e"  # Input: 1 scalar feature per node
+  hidden_irreps_1: "32x0e + 16x1o + 8x2e" # Hidden layers with scalar, vector, and tensor features
+  hidden_irreps_2: "32x0e + 16x1o + 8x2e"
+  out_irreps: "1x1o" # Output: a vector for each node (interpreted as 3D coordinates)
+  mlp_hidden_dim: 3 # The final output dimension is 3 (x,y,z)
+
+# --- Common settings from the original config ---
+graph:
+  knn_value: 10
+
+data:
+  systems:
+    - name: "System1"
+      json_path: "/path/to/your/system1_coords.json"
+      # ... other system paths
+
+output_directories:
+  checkpoint_dir: "./checkpoints"
+  latent_dir: "./latent_reps_cueq"
+```
+
+**Step 2: Run the Training Script**
+Launch the DDP training using the new script and config file.
+
+```bash
+# Example for a 4-GPU node
+torchrun --standalone --nproc_per_node=4 chebnet_blind_cueq.py --config param_cueq.yaml
+```
+
+This will train the equivariant encoder and save its checkpoint in the specified `checkpoint_dir`. This checkpoint contains a powerful, geometry-aware representation of your protein systems.
